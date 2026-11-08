@@ -1,12 +1,39 @@
-/* audio.js -- little synthesized sounds (WebAudio, no files). SFX.play(name). Off in Options. */
+/* audio.js -- the sound effects. SFX.play(name). Off in Options.
+   The sounds are short clips made with ElevenLabs Sound Effects (sfx/*.mp3; the prompts, and how to replace one,
+   are in sfx/README.md). They load when the audio starts (the first click or key); until a clip is ready, or if it
+   can't load, a little synthesized stand-in plays instead. */
 (function () {
   'use strict';
   let ctx = null, master = null;
+  const FILES = ['key', 'del', 'flip', 'bad', 'win', 'lose', 'ok', 'back', 'ping', 'msg', 'level', 'tick', 'go', 'solve'];
+  const bufs = {};
+  function load() {
+    for (const n of FILES) {
+      fetch('sfx/' + n + '.mp3').then(r => { if (!r.ok) throw new Error('no file'); return r.arrayBuffer(); })
+        .then(b => ctx.decodeAudioData(b)).then(b => { bufs[n] = b; }).catch(() => { /* the stand-in plays */ });
+    }
+  }
   const ac = () => {
-    if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); master.gain.value = 0.35; master.connect(ctx.destination); } catch (e) { return null; } }
+    if (!ctx) {
+      try { ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); master.gain.value = 0.35; master.connect(ctx.destination); } catch (e) { return null; }
+      load();
+    }
     if (ctx.state === 'suspended' && !document.hidden) ctx.resume();
     return ctx;
   };
+
+  /* which clip a sound plays, and how fast: the tile flips are one clip, pitched down for a miss and up for a
+     near / a hit; key presses vary a little so typing doesn't sound mechanical */
+  const CLIP = { flip0: ['flip', 0.84], flip1: ['flip', 1], flip2: ['flip', 1.19] };
+  function clip(name, t) {
+    const [file, rate] = CLIP[name] || [name, name === 'key' ? 0.96 + Math.random() * 0.08 : 1];
+    if (!bufs[file]) return false;
+    const s = ctx.createBufferSource();
+    s.buffer = bufs[file]; s.playbackRate.value = rate; s.connect(master); s.start(t);
+    return true;
+  }
+
+  /* the stand-ins */
   function tone(f, t0, dur, o = {}) {
     const c = ctx, osc = c.createOscillator(), g = c.createGain();
     osc.type = o.type || 'sine'; osc.frequency.setValueAtTime(f, t0);
@@ -35,10 +62,11 @@
   };
   window.SFX = {
     ctx: () => ac(),            // (shared with the music)
+    get loaded() { return Object.keys(bufs).length; },
     play(name) {
       if (window.Auth && Auth.user && !Auth.prefs.sound) return;
       const c = ac(); if (!c || !SOUNDS[name]) return;
-      try { SOUNDS[name](c.currentTime + 0.005); } catch (e) { /* fine */ }
+      try { const t = c.currentTime + 0.005; if (!clip(name, t)) SOUNDS[name](t); } catch (e) { /* fine */ }
     },
   };
 })();

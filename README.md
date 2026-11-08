@@ -57,6 +57,13 @@ cross-fades between screens, dips under results, and pauses when the tab is hidd
 [music/README.md](music/README.md) has the prompts, how to add or replace a track (`tools/loopify.py` turns a song into
 a loop), and a note on rights: both sets were made on free plans, which are for non-commercial use.
 
+## Sound effects
+
+Fourteen short clips made with ElevenLabs Sound Effects (`sfx/`): typing, tile flips (pitched for grey, yellow and
+green), wins, losses, buttons, countdowns, notifications and level-ups. They can be turned off under Options → SOUND
+EFFECTS. [sfx/README.md](sfx/README.md) has the prompts and how to replace one (`tools/sfxprep.py` trims and levels
+a new clip). Same rights note as the music: free plan, non-commercial.
+
 ## Online (set up like Knock//Back)
 
 There is no server of ours. Two pieces, both free and public, the same ones Knock//Back uses:
@@ -113,7 +120,8 @@ messages from everyone or friends only; swear filter.
 | --- | --- |
 | `index.html` | the page; loads everything |
 | `js/util.js` | DOM, storage, seeded random, text cleaning |
-| `js/audio.js`, `js/music.js` | sound effects, and the soundtrack (the composed tracks, or the recorded sets in `music/`) |
+| `js/audio.js`, `js/music.js` | the sound effects (the clips in `sfx/`), and the soundtrack (the composed tracks, or the recorded sets in `music/`) |
+| `sfx/` | the ElevenLabs sound effects, prompts and notes |
 | `music/` | the ElevenLabs and Suno loops, `tracks.json` (their loop points), prompts and notes |
 | `js/words.js` | the answer and guess lists (generated, ~215 KB) |
 | `js/engine.js` | scoring, hard mode, games of 1–4 boards, the Daily word, the CPU solver |
@@ -128,7 +136,7 @@ messages from everyone or friends only; swear filter.
 | `js/main.js` | screens and keyboard routing |
 | `css/style.css` | all styles (dark and light themes, high-contrast tiles) |
 | `sw.js`, `manifest.webmanifest`, `icons/` | installable app and offline solo play |
-| `tools/` | dev server, version stamp, word-list builder, icon maker, tests, song-to-loop cutter (`loopify.py`) |
+| `tools/` | dev server, version stamp, word-list builder, icon maker, tests, song-to-loop cutter (`loopify.py`), sound-effect trimmer (`sfxprep.py`) |
 
 ## Word lists
 
