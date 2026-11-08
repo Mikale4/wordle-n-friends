@@ -1,0 +1,76 @@
+/* tutorial.css -- the step-by-step tutorials (tutorial.js) and the ? buttons */
+.modal.tut { width: min(460px, calc(100vw - 24px)); }
+.tut .mbody { padding-top: 4px; }
+.tut-body { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; min-height: 270px; }
+.tut-body h3 { margin: 4px 0 0; font: 700 20px var(--font); letter-spacing: .04em; color: var(--text); }
+.tut-body p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 15px; max-width: 40ch; }
+.tut-from { font: 800 10px var(--font); letter-spacing: .14em; color: var(--accent2); }
+.tut-art { min-height: 120px; display: flex; align-items: center; justify-content: center; padding: 10px 0 4px; max-width: 100%; }
+.tut-dots { display: flex; justify-content: center; gap: 6px; margin-top: 14px; }
+.tut-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--panel3); transition: background .2s, transform .2s; }
+.tut-dots i.done { background: color-mix(in srgb, var(--accent) 50%, var(--panel3)); }
+.tut-dots i.on { background: var(--accent2); transform: scale(1.3); }
+.tut .mfoot { justify-content: space-between; }
+.tut-col { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.tut-row { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.tut-legend { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.tut-legend span { font: 800 11px var(--font); letter-spacing: .06em; padding: 5px 9px; border-radius: 8px; color: #fff; text-transform: uppercase; }
+.tut-legend [data-s='2'] { background: var(--hit); } .tut-legend [data-s='1'] { background: var(--near); } .tut-legend [data-s='0'] { background: var(--miss); }
+.tilerow.ghost .tile:not([data-s='2']):not([data-s='1']) { opacity: .45; }
+.tut-kb { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
+.tut-kb span { width: 30px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 7px; background: var(--panel3); color: var(--text); font: 700 15px var(--font); }
+.tut-kb [data-s='2'] { background: var(--hit); color: #fff; } .tut-kb [data-s='1'] { background: var(--near); color: #fff; } .tut-kb [data-s='0'] { background: color-mix(in srgb, var(--miss) 60%, var(--bg)); color: var(--faint); }
+.tut-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; background: var(--panel2); border-radius: 12px; padding: 8px 14px; min-width: 64px; }
+.tut-stat small { font: 800 10px var(--font); letter-spacing: .1em; color: var(--faint); }
+.tut-stat b { font: 700 20px var(--font); color: var(--text); }
+.tut-stat.gold b { color: var(--gold); }
+.tut-arrow { font: 700 18px var(--font); color: var(--good); }
+.tut-bar { width: 220px; }
+.tut-code { font: 700 22px var(--font); letter-spacing: .12em; color: var(--text); background: var(--panel2); padding: 6px 12px; border-radius: 10px; }
+.tut-q { width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: var(--panel2); font: 700 28px var(--font); color: var(--accent2); }
+.tut-pick { display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 6px; width: 300px; }
+.tut-pick > * { font: 800 9px var(--font); letter-spacing: .08em; padding: 14px 4px; border-radius: 10px; background: var(--panel2); color: var(--muted); display: flex; align-items: center; justify-content: center; }
+.tut-pick b { font-size: 13px; color: #fff; background: color-mix(in srgb, var(--hit) 55%, var(--panel2)); padding: 22px 4px; }
+.tut-pick .wide { grid-column: 2; }
+.tut-chat { background: var(--panel2); border-radius: 10px; padding: 8px 12px; text-align: left; font-size: 13px; color: var(--muted); }
+.tut-quadkey { position: relative; width: 56px; height: 64px; display: grid; grid-template-columns: 1fr 1fr; border-radius: 9px; overflow: hidden; }
+.tut-quadkey i[data-s='2'] { background: var(--hit); } .tut-quadkey i[data-s='1'] { background: var(--near); } .tut-quadkey i[data-s='0'] { background: var(--miss); }
+.tut-quadkey b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 700 22px var(--font); color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); }
+.tut-cpu small, .tut-col > small { font: 800 10px var(--font); letter-spacing: .1em; color: var(--faint); }
+
+/* Runecasters */
+.tut-rg { display: grid; grid-template-columns: repeat(var(--c), 46px); gap: 5px; }
+.tut-rg span { position: relative; height: 46px; border-radius: 10px; background: var(--panel3); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font: 700 19px var(--font); color: var(--text); }
+.tut-rg span.on { background: color-mix(in srgb, var(--accent) 70%, var(--panel3)); border-color: var(--accent2); color: #fff; box-shadow: 0 0 12px color-mix(in srgb, var(--accent2) 55%, transparent); }
+.tut-rg span.rune { border: 2px solid var(--gold); box-shadow: 0 0 10px color-mix(in srgb, var(--gold) 45%, transparent); }
+.tut-rg .tag { position: absolute; top: 2px; left: 3px; font: 800 8px var(--font); font-style: normal; color: var(--gold); }
+.tut-rg .ord { position: absolute; bottom: 2px; right: 4px; font: 800 9px var(--font); color: rgba(255, 255, 255, .8); }
+.tut-rg span.mana::after { content: ''; position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; transform: rotate(45deg); background: #7dd3fc; border-radius: 2px; box-shadow: 0 0 6px #38bdf8; }
+
+/* Wordwright */
+.tut-wb { display: grid; grid-template-columns: repeat(var(--n), 34px); gap: 3px; padding: 6px; border-radius: 10px; background: var(--bg2); }
+.tut-wb span { height: 34px; border-radius: 6px; background: color-mix(in srgb, var(--panel3) 70%, transparent); display: flex; align-items: center; justify-content: center; font: 700 15px var(--font); }
+.tut-wb .t { background: color-mix(in srgb, var(--miss) 85%, var(--panel3)); color: #fff; }
+.tut-wb .t.new { background: var(--near); }
+.tut-wb .star { color: var(--gold); }
+.tut-wb .p { font: 800 10px var(--font); color: #fff; }
+.tut-wb .p2L { background: color-mix(in srgb, var(--accent) 45%, var(--panel3)); } .tut-wb .p3L { background: var(--accent); }
+.tut-wb .p2W { background: color-mix(in srgb, var(--hot) 45%, var(--panel3)); } .tut-wb .p3W { background: var(--hot); }
+.tut-rack { display: flex; gap: 4px; }
+.tut-rack span { width: 30px; height: 32px; border-radius: 6px; background: var(--near); color: #fff; font: 700 15px var(--font); display: flex; align-items: center; justify-content: center; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .2); }
+
+/* Chess */
+.tut-cb { display: grid; grid-template-columns: repeat(var(--c), 44px); border-radius: 8px; overflow: hidden; }
+.tut-cb span { position: relative; height: 44px; display: flex; align-items: center; justify-content: center; }
+.tut-cb .lt { background: #ddd5f3; } .tut-cb .dk { background: #8b74c9; }
+.tut-cb svg { width: 86%; height: 86%; }
+.tut-cb .tdot::after { content: ''; width: 26%; height: 26%; border-radius: 50%; background: rgba(30, 20, 60, .35); }
+.tut-cb .cap { box-shadow: inset 0 0 0 4px rgba(30, 20, 60, .35); }
+.tut-cb .from, .tut-cb .to { background: #f3d58a; }
+.tut-cb .chk { background: radial-gradient(circle, #ff5d73 0%, #ff5d7300 75%), #ddd5f3; }
+
+/* the ? buttons */
+.tutbtn .ico { opacity: .85; }
+.cardhelp { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel2); color: var(--muted); font: 800 13px var(--font); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1; }
+.cardhelp:hover { color: var(--text); border-color: var(--accent2); }
+@media (max-width: 420px) { .tut-rg { grid-template-columns: repeat(var(--c), 40px); } .tut-rg span { height: 40px; } .tut-wb { grid-template-columns: repeat(var(--n), 30px); } .tut-wb span { height: 30px; } .tut-body { min-height: 300px; } }

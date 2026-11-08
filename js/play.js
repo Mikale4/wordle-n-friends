@@ -67,7 +67,7 @@
     C.side = el('div', { class: 'gside' });
     C.noteEl = el('div', { class: 'gnotes' });
     C.stage = el('div', { class: 'gstage' });
-    const scr = el('div', { class: 'screen play mode-' + mode }, Menu.ui.topbar(o.title || TITLES[mode], () => quit(), C.info),
+    const scr = el('div', { class: 'screen play mode-' + mode }, Menu.ui.topbar(o.title || TITLES[mode], () => quit(), C.info, Tutorial.button('w-' + mode)),
       el('div', { class: 'gwrap' }, C.side, el('div', { class: 'gmain' }, C.noteEl, C.stage)));
     App.screen(scr);
     App.onLeave(() => { if (C && C.id === id) { C.timers.forEach(t => { clearInterval(t); clearTimeout(t); }); C = null; } });
@@ -293,8 +293,10 @@
   }
 
   window.Play = {
+    /* the first time you play a mode, its tutorial first (and the basics, the first time of all) */
     start(mode, o = {}) {
-      ({ daily, classic, quad, blitz, survival, cpu })[mode](o);
+      const run = () => ({ daily, classic, quad, blitz, survival, cpu })[mode](o);
+      Tutorial.first('w-' + mode, run, 'wordle');
     },
     PRAISE, emoji, share,
   };

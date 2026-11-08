@@ -40,7 +40,9 @@
       const g = id === 'wordle' ? { name: 'Wordle', blurb: 'Guess the hidden word. Daily, Classic, Quad, Blitz, Survival, VS CPU, online and ranked.' } : Games.get(id);
       if (!g) return null;
       const go = () => { SFX.play('ok'); if (id === 'wordle') Menu.hub(); else hub(id); };
-      return el('div', { class: 'pick ' + cls + ' pick-' + id, role: 'button', tabindex: 0, onclick: go, onkeydown: e => { if (e.key === 'Enter') go(); } },
+      const tk = id === 'wordle' ? 'wordle' : id;
+      return el('div', { class: 'pick ' + cls + ' pick-' + id, role: 'button', tabindex: 0, onclick: e => { if (!e.target.closest('.cardhelp')) go(); }, onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) go(); } },
+        el('button', { class: 'cardhelp', title: 'How to play ' + g.name, 'aria-label': 'How to play ' + g.name, onclick: e => { e.stopPropagation(); SFX.play('ok'); Tutorial.show(tk); } }, '?'),
         el('div', { class: 'pickpic' }, art(id)),
         el('h2', null, g.name.toUpperCase()),
         el('p', null, g.blurb),
@@ -105,6 +107,7 @@
   }
 
   function howto(g) {
+    if (window.Tutorial && Tutorial.has(g.id)) return Tutorial.show(g.id);
     const parts = (g.howto || [g.blurb]).map(t => Array.isArray(t) ? el('ul', null, ...t.map(x => el('li', null, x))) : /^[A-Z][A-Z ]+$/.test(t) ? el('h3', null, t) : el('p', null, t));
     Menu.modal({ title: 'HOW TO PLAY ' + g.name.toUpperCase(), cls: 'howto', body: parts, buttons: [['GOT IT', () => {}, 'big']] });
   }

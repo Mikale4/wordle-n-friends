@@ -72,8 +72,9 @@
     return wrap;
   }
 
-  /* how to play: the colours, with examples */
+  /* how to play Wordle: the step-by-step tutorial (tutorial.js); the old one-page version is the fallback */
   function howto() {
+    if (window.Tutorial && Tutorial.has('wordle')) return Tutorial.show('wordle');
     modal({ title: 'HOW TO PLAY', cls: 'howto', body: [
       el('p', null, 'Guess the hidden word. Each guess must be a real word of the right length; press ENTER to check it.'),
       el('p', null, 'After each guess the tiles show how close you are:'),
@@ -156,13 +157,14 @@
       if (Auth.prefs.autoOnline) Net.start();
       Social.init();
       Menu.home();
-      if (fresh) setTimeout(() => { toast('Welcome, ' + Auth.name + '! Your friend code is ' + Auth.name + '#' + Auth.tag, 'gold', 4200); howto(); }, 400);
+      if (fresh) setTimeout(() => toast('Welcome, ' + Auth.name + '! Your friend code is ' + Auth.name + '#' + Auth.tag, 'gold', 4200), 400);
+      setTimeout(() => { if (Auth.user && document.querySelector('.screen.picker')) Tutorial.first('welcome'); }, 600);   // (once per player)
     },
 
     /* home: the game picker (arcade.js) */
     home() { Arcade.picker(); },
     /* the bar along the top of the picker and the Wordle hub: you, your level and rank, friends, options */
-    homeBar(onBack) {
+    homeBar(onBack, help) {
       const S = Auth.S, L = Rank.level(S.xp);
       return el('div', { class: 'topbar hubbar' },
         onBack ? el('button', { class: 'backbtn', title: 'Back to the games (Esc)', 'aria-label': 'Back', onclick: () => { SFX.play('back'); onBack(); } }, '‹') : null,
@@ -173,7 +175,7 @@
           Rank.badge(S.rank.rating, { small: true })),
         socialButtons(),
         el('button', { class: 'iconbtn', title: 'Options', onclick: () => Menu.options() }, el('span', { class: 'ico ico-gear' })),
-        el('button', { class: 'iconbtn', title: 'How to play', onclick: howto }, el('span', { class: 'ico ico-help' })),
+        Tutorial.button(help || 'welcome'),
         btn('LOG OUT', () => { Auth.logout(); Menu.login('in'); }, 'ghost small'));
     },
 
@@ -186,7 +188,9 @@
       const S = Auth.S, P = S.prefs, R = S.rank, L = Rank.level(S.xp);
       const day = U.dayNum(), dd = S.daily[day], dstat = Auth.stat('daily');
       const lenChips = (cur, set) => el('div', { class: 'chips' }, ...Engine.LENS.map(n => el('button', { class: n === cur ? 'on' : '', onclick: e => { e.stopPropagation(); SFX.play('key'); set(n); } }, n)));
-      const card = (cls, title, desc, go, ...extra) => el('div', { class: 'card ' + cls, role: 'button', tabindex: 0, onclick: e => { if (e.target.closest('.chips, .btn')) return; SFX.play('ok'); go(); }, onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) go(); } },
+      const TUT = { daily: 'w-daily', classic: 'w-classic', quad: 'w-quad', blitz: 'w-blitz', survival: 'w-survival', cpu: 'w-cpu', online: 'lobby', ranked: 'w-ranked' };
+      const help = cls => { const k = TUT[cls.split(' ')[0]]; return k ? el('button', { class: 'cardhelp', title: 'How to play', 'aria-label': 'How to play', onclick: e => { e.stopPropagation(); SFX.play('ok'); Tutorial.show(k); } }, '?') : null; };
+      const card = (cls, title, desc, go, ...extra) => el('div', { class: 'card ' + cls, role: 'button', tabindex: 0, onclick: e => { if (e.target.closest('.chips, .btn, .cardhelp')) return; SFX.play('ok'); go(); }, onkeydown: e => { if (e.key === 'Enter' && e.target === e.currentTarget) go(); } }, help(cls),
         el('div', { class: 'cardico' }), el('h3', null, title), el('p', null, desc), ...extra);
       const len = P.len || 5;
       const setLen = n => { P.len = n; Auth.save(); Menu.hub(); };
@@ -208,7 +212,7 @@
         }
       };
       const s = el('div', { class: 'screen hub' },
-        Menu.homeBar(() => Menu.home()),
+        Menu.homeBar(() => Menu.home(), 'wordle'),
         room ? el('div', { class: 'roombanner' }, el('span', null, "You're still in room "), el('b', null, room.name + (room.playing ? ' · match on' : '')), el('div', { class: 'grow' }),
           btn('BACK TO THE ROOM', () => Online.back(), 'small hot'), btn('LEAVE IT', () => { Online.leave(true); Menu.hub(); }, 'ghost small')) : null,
         el('div', { class: 'hubmain' },
@@ -254,6 +258,8 @@
             'Three versions of the same six themes. ' + ((Music.soundtracks.find(s => s[0] === Music.soundtrack) || [])[2] || '')),
           seg('SOUND EFFECTS', P.sound, [[true, 'On'], [false, 'Off']], v => set('sound', v === true || v === 'true'), 'Made with ElevenLabs Sound Effects.'),
           el('h3', null, 'GAMEPLAY'),
+          el('div', { class: 'seg' }, el('span', null, 'TUTORIALS'), el('div', null, el('button', { onclick: () => { SFX.play('key'); Tutorial.reset(); toast('Tutorials will show again the first time you play each game and mode.', 'gold', 3600); } }, 'Show them all again')),
+            el('small', null, 'Each game and mode shows how to play the first time. Press ? on any game screen to see it again.')),
           seg('HARD MODE', P.hard, [[false, 'Off'], [true, 'On']], v => set('hard', v === true || v === 'true'), 'Hits must stay in place and near letters must be reused, in Daily, Classic, Blitz, Survival and VS CPU. Online rooms set their own.'),
           el('h3', null, 'ONLINE'),
           seg('GO ONLINE', P.autoOnline, [[true, 'When I log in'], [false, 'Only when I open the lobby']], v => set('autoOnline', v === true || v === 'true'), 'Online, friends see you and your messages arrive. Status: ' + st + '.'),

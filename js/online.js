@@ -539,7 +539,7 @@
     quickNext();
   }
   Online.quick = () => findMatch(false);
-  Online.ranked = () => findMatch(true);
+  Online.ranked = () => Tutorial.first('w-ranked', () => findMatch(true), 'wordle');
   Online.quickGame = id => findMatch(false, id);
   /* the lobby's NEW ROOM form, set to a game */
   Online.hostGame = id => {
@@ -728,7 +728,7 @@
     const scr = el('div', { class: 'screen online game mode-' + G.mode + (R.ranked ? ' ranked' : '') },
       el('div', { class: 'topbar' }, el('button', { class: 'backbtn', title: 'Back to the room', onclick: () => { SFX.play('back'); N.view = 'room'; show(); } }, '‹'),
         el('h1', null, R.ranked ? 'RANKED' : MODE_TXT[G.mode].toUpperCase()), el('em', { class: 'pill' }, 'ROUND ' + G.r + ' / ' + G.rounds),
-        G.hard ? el('em', { class: 'pill' }, 'HARD') : null, el('div', { class: 'grow' }), G.mineEl, G.clock),
+        G.hard ? el('em', { class: 'pill' }, 'HARD') : null, el('div', { class: 'grow' }), G.mineEl, G.clock, Tutorial.button(R.ranked ? 'w-ranked' : 'w-online')),
       G.bar,
       el('div', { class: 'gwrap' },
         el('div', { class: 'gmain' }, G.noteEl, G.play ? G.stage : el('div', { class: 'spect' }, el('h2', null, 'WATCHING'), el('p', null, 'You\'re not in this match. Everyone\'s progress is on the right; the words show at the end of the round.')), G.waitEl),
@@ -862,6 +862,7 @@
     if (Net.state === 'off') Net.start();
     if (!N) N = freshN();
     show();
+    if (N.stage !== 'room') setTimeout(() => { if (Online.view() === 'lobby') Tutorial.first('lobby'); }, 300);   // (the first visit)
   };
   Online.back = () => { if (N && N.room && N.stage === 'room') { N.view = 'room'; show(); } else Online.open(); };
 
@@ -928,7 +929,7 @@
     const pfilter = el('input', { type: 'text', class: 'input small', placeholder: 'Find a player', value: N.pq || '', oninput: e => { N.pq = e.target.value; fillPlayers(); } });
     const plist = el('div', { class: 'plist' }), pcount = el('small', null, '');
     const tabs = el('div', { class: 'tabs lobbytabs' }, ...[['play', 'PLAY'], ['chat', 'CHAT'], ['players', 'PLAYERS']].map(([k, t]) => el('button', { class: N.tab === k ? 'on' : '', onclick: () => { N.tab = k; show(); } }, t)));
-    const scr = el('div', { class: 'screen online lobby tab-' + N.tab }, topbar('ONLINE LOBBY', () => { Online.away(); Menu.home(); }),
+    const scr = el('div', { class: 'screen online lobby tab-' + N.tab }, topbar('ONLINE LOBBY', () => { Online.away(); Menu.home(); }, Tutorial.button('lobby')),
       tabs,
       el('div', { class: 'lobbygrid' },
         el('section', { class: 'panel lcol lplay' }, ...play, N.status ? el('p', { class: 'olstatus' }, N.status) : null),
@@ -1033,7 +1034,8 @@
       ...(RG.options || []).map(op => seg(op.label, rules[op.key], op.values, v => HC.rule(op.key, v), canRule)),
       el('p', { class: 'small muted' }, RG.blurb + '. ' + (RG.players[1] === 2 ? 'Two play; anyone else in the room watches.' : 'Up to ' + RG.players[1] + ' play (the first who are READY); anyone else watches.')),
       el('button', { class: 'linkbtn', onclick: () => Arcade.howto(RG) }, 'How to play ' + RG.name)) : null;
-    const scr = el('div', { class: 'screen online room' + (RG ? ' g-' + RG.id : '') }, topbar(R.ranked ? 'RANKED MATCH' : RG ? RG.name.toUpperCase() + ' ROOM' : 'ROOM', () => confirmLeave()),
+    const tutKey = R.ranked ? 'w-ranked' : RG ? RG.id : 'w-online';
+    const scr = el('div', { class: 'screen online room' + (RG ? ' g-' + RG.id : '') }, topbar(R.ranked ? 'RANKED MATCH' : RG ? RG.name.toUpperCase() + ' ROOM' : 'ROOM', () => confirmLeave(), Tutorial.button('rooms', 'How rooms work')),
       el('div', { class: 'roomgrid' },
         el('section', { class: 'panel rmain' },
           el('div', { class: 'rhead' },
@@ -1053,7 +1055,8 @@
             seg('ROUNDS', rules.rounds, [[1, '1'], [3, '3'], [5, '5'], [10, '10']], v => HC.rule('rounds', +v), canRule),
             seg(rules.mode === 'blitz' ? 'ROUND LENGTH' : 'TIME LIMIT', rules.time, rules.mode === 'blitz' ? [[60, '60 s'], [120, '2 min'], [180, '3 min']] : [[60, '60 s'], [120, '2 min'], [180, '3 min'], [0, 'None']], v => HC.rule('time', +v), canRule),
             seg('HARD MODE', rules.hard, [[false, 'Off'], [true, 'On']], v => HC.rule('hard', v === true || v === 'true'), canRule),
-            el('p', { class: 'small muted' }, rules.mode === 'race' ? 'RACE: everyone gets the same word. Solve it: 100, +20 for each guess you didn\'t need, +60/40/20 for 1st/2nd/3rd to solve.' : rules.mode === 'blitz' ? 'BLITZ: the same run of words for everyone; solve as many as you can before time. 50 a word, +10 for each guess you didn\'t need.' : 'QUAD: four words, nine guesses. 50 a board; finish all four for the race bonus.')),
+            el('p', { class: 'small muted' }, rules.mode === 'race' ? 'RACE: everyone gets the same word. Solve it: 100, +20 for each guess you didn\'t need, +60/40/20 for 1st/2nd/3rd to solve.' : rules.mode === 'blitz' ? 'BLITZ: the same run of words for everyone; solve as many as you can before time. 50 a word, +10 for each guess you didn\'t need.' : 'QUAD: four words, nine guesses. 50 a board; finish all four for the race bonus.'),
+            el('button', { class: 'linkbtn', onclick: () => Tutorial.show(tutKey) }, R.ranked ? 'How ranked works' : 'How online Wordle works')),
           host ? el('div', { class: 'rset' }, el('h3', null, 'ROOM'),
             el('label', { class: 'field keepfocus' }, el('span', null, 'NAME'), hostName, btn('SAVE', () => HC.set('name', hostName.value), 'ghost small')),
             R.ranked ? null : seg('TYPE', R.priv, [[false, 'Public'], [true, 'Private']], v => { const on = v === true || v === 'true'; if (on && !(N.pass || hostPass.value.trim())) { toast('Type a password first, then press SAVE.', 'bad'); return; } HC.set('priv', { on, pass: on ? N.pass || hostPass.value.trim() : '' }); }),
@@ -1069,6 +1072,11 @@
           el('label', { class: 'check' }, el('input', { type: 'checkbox', checked: Auth.prefs.filter || null, onchange: e => { Auth.prefs.filter = e.target.checked; Auth.save(); drawChat(); } }), 'Filter swear words'))));
     App.screen(scr); N.view = 'room'; setPresence();
     App.onLeave(() => { if (N) N.view = null; });
+    /* the first time in a room: how rooms work, then how this game is played online */
+    if (!N.tutDone) {
+      N.tutDone = true;
+      setTimeout(() => { if (Online.view() === 'room') Tutorial.first(R.ranked ? 'w-ranked' : 'rooms', () => Tutorial.first(tutKey, null, RG ? null : 'wordle')); }, 400);
+    }
     drawChat();
     scr.addEventListener('focusout', () => setTimeout(() => { if (N && N.dirty && N.view === 'room') { N.dirty = false; show(); } }, 250));
   }

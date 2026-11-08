@@ -75,7 +75,7 @@
   /* ---- the game screen */
   function screen(g, o) {
     const area = el('div', { class: 'gamearea g-' + g.id });
-    const scr = el('div', { class: 'screen arcade play g-' + g.id + (o.online ? ' onlinegame' : '') }, Menu.ui.topbar(o.title || g.name.toUpperCase(), o.onBack, ...(o.extra || [])), area);
+    const scr = el('div', { class: 'screen arcade play g-' + g.id + (o.online ? ' onlinegame' : '') }, Menu.ui.topbar(o.title || g.name.toUpperCase(), o.onBack, ...(o.extra || []), Tutorial.button(g.id)), area);
     App.screen(scr);
     let ui;
     try { ui = g.mount(area, o.api); } catch (e) { console.error(e); area.append(el('p', { class: 'err' }, 'This game couldn\'t start: ' + e.message)); }
@@ -145,6 +145,7 @@
   async function local(id, set) {
     const g = Games.get(id); if (!g || !Auth.user) return;
     set = set || {};
+    if (Tutorial.has(id) && !Tutorial.seen(id)) { Tutorial.first(id, () => local(id, set)); return; }   // the first time: how to play
     if (g.lex && !Lex.ready) {
       loading(g);
       try { await Lex.load(); } catch (e) { toast(e.message, 'bad'); Arcade.hub(id); return; }

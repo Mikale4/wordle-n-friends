@@ -40,6 +40,14 @@ its own menu: a game against CPU players (1–3 or 5 of them, Easy / Normal / Ha
 **The Wordle hub** has every Wordle mode, your rank and level, friends online, and the Friends / Messages buttons (with
 unread counts) that sit in the top bar of every screen. If you step out of an online room, a banner takes you back to it.
 
+## Tutorials
+
+Every game and mode has a short illustrated tutorial (`js/tutorial.js`): a welcome tour after you first log in, Wordle's
+basics, each Wordle mode (Daily, Classic, Quad, Blitz, Survival, VS CPU), online Wordle, Ranked, the online lobby, rooms,
+and Runecasters, Wordwright and Chess. Each shows the first time you start that game or mode (Wordle's basics come first
+the very first time), and again from the **?** on its card, on any game screen, in the lobby and in rooms. Options →
+TUTORIALS shows them all again.
+
 ## The other games
 
 They're our own games, in the same genres as some well-known ones, with their own names, rules details and look.
@@ -172,6 +180,7 @@ messages from everyone or friends only; swear filter.
 | `js/games.js` | the contract the other games follow, and their list |
 | `js/match.js` | runs the other games: vs CPU on your device, or on a room's host; their game screen, results, stats and XP |
 | `js/arcade.js` | the game picker, and each of the other games' menus |
+| `js/tutorial.js` | the tutorials for every game and mode, and the ? buttons (styles in `css/tutorial.css`) |
 | `js/runes.js`, `js/wright.js`, `js/chess.js` (+ `js/chess-ai.js`) | Runecasters, Wordwright and Chess: rules, CPU players, screens (styles in `css/`) |
 | `js/lexicon.js`, `js/dict.js` | the big dictionary for Runecasters and Wordwright, loaded when first needed |
 | `js/relay.js` | the fallback link for rooms, over the MQTT brokers, when a direct link can't get through |

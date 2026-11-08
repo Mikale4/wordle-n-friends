@@ -1255,7 +1255,7 @@
     ],
     options: [{ key: 'clock', label: 'CLOCK', values: [['none', 'No clock'], ['3+2', '3 + 2'], ['5+0', '5 min'], ['10+0', '10 min']], def: 'none' }],
     setup, view, move, turn, due, timeout, result, cpu, mount,
-    search, levels: LEVELS, lib,
+    search, levels: LEVELS, lib, svg: SVG,                     // (svg: the piece drawings, for the tutorial)
   };
   G.Chess = game;
   if (G.Games) G.Games.add(game);
