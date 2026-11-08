@@ -82,6 +82,12 @@ There is no server of ours. Two pieces, both free and public, the same ones Knoc
 - **PeerJS (WebRTC)** links the browsers in a room directly. The host's game holds the hidden words and checks every
   guess, so no other player's game knows the answer until the round ends; everyone sees each other's progress as
   colours only.
+- **The relay fallback** (`js/relay.js`). A direct link can't get through some home routers and most mobile networks,
+  and the free relay servers WebRTC used to fall back on (PeerJS's own) have shut down. So if the direct link hasn't
+  opened after 4 seconds (or fails), the room's messages go over the two MQTT brokers instead, under
+  `rl/<code>/`, encrypted between the two games with a fresh ECDH key pair per link (AES-GCM), numbered so they
+  arrive in order. Joining that way takes about 6 seconds. To test it on one computer, set
+  `localStorage['wnf.relay'] = '"always"'` in the joining tab.
 
 **The lobby**: Quick Match, Ranked Match, Host a room, Join by code, the room list, lobby chat, and everyone online
 (friends first). Click anyone for their player card: add friend, message, **challenge** (a private two-player room opens
@@ -110,7 +116,9 @@ messages from everyone or friends only; swear filter.
   reports (signed, so nobody can post as someone else, but a determined cheater could edit their own save). The room host's
   game knows the words.
 - Anything posted in the open on the brokers is public: names, ratings, statuses, lobby chat. Messages, challenges and
-  invites are encrypted. In a room, the other players can see your IP address, as in any peer-to-peer game.
+  invites are encrypted. In a room, the other players can see your IP address, as in any peer-to-peer game. A
+  relayed room's messages pass through the public brokers encrypted, but nothing checks who answered first, so a
+  determined attacker on the broker could sit in the middle of a relayed link (as with the trust note above).
 - Accounts, friends lists and message history are stored per browser. A new device means a new account (a new ID).
 - Free public brokers can drop retained messages; an offline message is best effort.
 
@@ -132,6 +140,7 @@ messages from everyone or friends only; swear filter.
 | `js/board.js` | the boards, keyboard and mini progress boards |
 | `js/play.js` | the solo modes |
 | `js/online.js` | the lobby, rooms, quick / ranked match, the online match |
+| `js/relay.js` | the fallback link for rooms, over the MQTT brokers, when a direct link can't get through |
 | `js/menu.js` | title, login, hub, options, stats, shared UI |
 | `js/main.js` | screens and keyboard routing |
 | `css/style.css` | all styles (dark and light themes, high-contrast tiles) |

@@ -21,7 +21,9 @@
    start, and kick / block / mute.
 
    THE LINKS: the browsers connect directly (WebRTC, through PeerJS; the free
-   PeerJS service only introduces them). The host's game holds the words and
+   PeerJS service only introduces them). When a direct link can't get through
+   (some routers and mobile networks block it), the room's messages go over
+   the lobby's MQTT brokers instead, encrypted (relay.js). The host's game holds the words and
    checks every guess, so nobody else's game knows the answer until the round
    ends. Scoring (per round):
      RACE   solve it: 100 + 20 per guess you didn't need, + 60/40/20 for the
@@ -374,6 +376,7 @@
         N.room.members.push({ id, uid: me.uid, name: me.name, r: me.r, lv: me.lv, ready: !!(o.ready || o.ranked || o.chal), sit: false, host: true });
         clearInterval(N.tickT); N.tickT = setInterval(hostTick, 250);
         Dir.host(code, listing);
+        N.relay = Relay.host(code, link => { if (N === S) hostConn(link); });     // guests who can't link directly
         N.chat.push({ sys: 'Room open. Its code is ' + code + '.' });
         if (o.chal) sendChallenge(o.chal);
         setPresence(); show();
@@ -397,18 +400,43 @@
     const S0 = N; Object.assign(N, { stage: 'joining', host: false, code, status: '', needPass: null, passFor: null, passUsed: pass || '', quick: o.quick ? N.quick : null }); show();
     try { await loadPeer(); } catch (e) { if (N === S0) { N.stage = 'lobby'; N.status = e.message; show(); } return; }
     if (N !== S0) return;
-    const peer = new Peer({ debug: 0 }), S = N; N.peer = peer;
+    /* Two ways in: the direct link (PeerJS) and, if that hasn't opened after a few seconds (or fails), the
+       relay over the lobby's brokers (relay.js). The first to open carries the room; the other is dropped. */
+    const peer = new Peer({ debug: 0 }), S = N; N.peer = peer; N.tries = [];
+    const relayOnly = U.read('wnf.relay', '') === 'always';                         // for testing the relay
+    const fail = text => { if (N !== S || N.stage !== 'joining' || N.conn) return; if (N.quick) quickFailed(); else roomGone(text); };
+    const adopt = link => {
+      if (N !== S || N.conn) { if (N.conn !== link) { link.dropped = true; try { link.close(); } catch (e) { /* fine */ } } return; }
+      N.conn = link; clearTimeout(N.relayT);
+      for (const c of N.tries) if (c !== link) { c.dropped = true; try { c.close(); } catch (e) { /* fine */ } }
+      link.on('data', d => { if (N === S) guestGot(d); });
+      link.on('close', () => { if (N === S && !N.leaving) { if (N.quick && N.stage === 'joining') quickFailed(); else roomGone(N.stage === 'joining' ? 'Couldn\'t join room ' + code + '.' : 'Lost the connection to the room.'); } });
+      link.send({ t: 'hello', ver: PROTO, me: meInfo(), pass: pass || '', ready: !!(o.ready || o.quick) });
+    };
+    const tryRelay = () => {
+      if (N !== S || N.conn || S.relayTried) return; S.relayTried = true; clearTimeout(N.relayT);
+      const link = Relay.join(code); N.tries.push(link);
+      link.on('open', () => adopt(link));
+      link.on('close', () => { if (!link.dropped && N === S && !N.conn) fail('No answer from room ' + code + '. It may have closed, or check the code.'); });
+    };
+    N.relayT = setTimeout(tryRelay, relayOnly ? 0 : o.quick ? 3000 : 4000);
     peer.on('open', () => {
-      if (N !== S) return;
-      const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json', metadata: { room: true } }); N.conn = conn;
-      conn.on('open', () => { if (N === S) conn.send({ t: 'hello', ver: PROTO, me: meInfo(), pass: pass || '', ready: !!(o.ready || o.quick) }); });
-      conn.on('data', d => { if (N === S) guestGot(d); });
-      conn.on('close', () => { if (N === S && !N.leaving) { if (N.quick && N.stage === 'joining') quickFailed(); else roomGone(N.stage === 'joining' ? 'Couldn\'t join room ' + code + '.' : 'Lost the connection to the room.'); } });
+      if (N !== S || relayOnly) return;
+      const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json', metadata: { room: true } }); N.tries.push(conn);
+      conn.on('open', () => adopt(conn));
+      conn.on('close', () => { if (!conn.dropped && N === S && !N.conn) tryRelay(); });          // the direct link failed
       conn.on('error', () => {});
-      setTimeout(() => { if (N === S && N.stage === 'joining') { if (N.quick) quickFailed(); else roomGone('No answer from room ' + code + '. It may have closed, or check the code.'); } }, N.quick ? 7000 : 12000);
     });
-    peer.on('error', e => { if (N !== S || N.peer !== peer) return; if (N.stage === 'joining') { if (N.quick) quickFailed(); else roomGone(why(e)); } });
+    peer.on('error', e => {
+      if (N !== S || N.peer !== peer || N.stage !== 'joining' || N.conn) return;
+      if (e.type === 'peer-unavailable') fail(why(e));                          // no room with that code
+      else tryRelay();
+    });
     peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) { /* fine */ } });
+    setTimeout(() => {                                                          // still not in: give up
+      if (N !== S || N.stage !== 'joining') return;
+      if (N.quick) quickFailed(); else roomGone('No answer from room ' + code + '. It may have closed, or check the code.');
+    }, o.quick ? 14000 : 22000);
   };
   Online.leave = quiet => {
     if (!N) return;
@@ -418,8 +446,12 @@
     }
     if (S.chal && S.room && S.room.chal) Net.send(S.chal.to, 'chalx', { code: S.code });
     if (S.host) { toAll({ t: 'closed' }); Dir.stopHost(); clearInterval(S.tickT); H = null; }
-    const peer = S.peer;
-    setTimeout(() => { try { if (S.conn) S.conn.close(); } catch (e) { /* fine */ } try { if (peer) peer.destroy(); } catch (e) { /* fine */ } }, 250);
+    const peer = S.peer; clearTimeout(S.relayT);
+    setTimeout(() => {
+      for (const c of new Set([S.conn, ...(S.tries || [])])) { try { if (c) { c.dropped = true; c.close(); } } catch (e) { /* fine */ } }
+      try { if (S.relay) S.relay.stop(); } catch (e) { /* fine */ }
+      try { if (peer) peer.destroy(); } catch (e) { /* fine */ }
+    }, 250);
     N = null; G = null;
     if (!quiet) Online.open();
   };
@@ -464,7 +496,8 @@
     Q.tried.add(rooms[0].code); Online.join(rooms[0].code, '', { quick: true });
   }
   function quickFailed() {
-    const Q = N.quick, peer = N.peer; N.leaving = true;
+    const Q = N.quick, peer = N.peer; N.leaving = true; clearTimeout(N.relayT);
+    for (const c of N.tries || []) { c.dropped = true; try { c.close(); } catch (e) { /* fine */ } }
     try { peer && peer.destroy(); } catch (e) { /* fine */ }
     N = freshN(); N.quick = Q; N.stage = 'quick'; show(); quickNext();
   }
@@ -774,7 +807,7 @@
         el('section', { class: 'panel lcol lchat' }, el('div', { class: 'olhead' }, el('h3', null, 'LOBBY CHAT'), el('small', null, 'Everyone online')), lchat,
           Auth.prefs.typed ? el('div', { class: 'sayrow keepfocus' }, lbox, btn('SEND', lsend, 'small')) : el('p', { class: 'small muted' }, 'Lobby chat is hidden (Options).')),
         el('section', { class: 'panel lcol lplayers' }, el('div', { class: 'olhead' }, el('h3', null, 'PLAYERS'), pcount), el('div', { class: 'keepfocus' }, pfilter), plist)),
-      el('p', { class: 'fine' }, 'Rooms link the players\' browsers directly (WebRTC via the free PeerJS service), so people in your room can see your IP address. The lobby, chat, friends and room list run on free public MQTT relays: names, ranks, statuses and lobby chat there are public.'));
+      el('p', { class: 'fine' }, 'Rooms link the players\' browsers directly (WebRTC via the free PeerJS service), so people in your room can see your IP address; where a direct link can\'t get through, the room runs over the public relays below instead, encrypted. The lobby, chat, friends and room list run on free public MQTT relays: names, ranks, statuses and lobby chat there are public.'));
     App.screen(scr); N.view = 'lobby'; setPresence();
     App.onLeave(() => { if (N) N.view = null; offs.forEach(f => f()); });
     const fillRooms = () => {
@@ -808,7 +841,7 @@
       lchat.scrollTop = 1e6;
     };
     const fillPlayers = () => {
-      if (!document.body.contains(plist)) return;
+      if (!N || !Auth.user || !document.body.contains(plist)) return;
       const q = (N.pq || '').trim().toLowerCase(), S = Auth.S;
       let ps = [...Net.players.values()].filter(p => !blockedU(p.id));
       pcount.textContent = Net.state === 'up' ? ps.length + ' online' : '';
