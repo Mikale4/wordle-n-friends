@@ -15,9 +15,11 @@
      g/<id>   to one guest
      all      to every guest (the host's last will)
    k is 'syn' (a guest asking to link, with its public key), 'ack' (the host's
-   answer, with its key), 'd' (a message: n, iv, ct), 'hb' (still here), 'fin'
-   (gone) or 'gone' (a last will: the broker lost that side; it may only be a
-   blip on one broker, so the link closes if nothing else arrives for 15 s).
+   answer, with its key), 'd' (a message: n, iv, ct), 'rx' (messages up to a
+   arrived; heartbeats carry a too, and anything not confirmed is sent again),
+   'hb' (still here), 'fin' (gone) or 'gone' (a last will: the broker lost
+   that side; it may only be a blip on one broker, so the link closes if
+   nothing else arrives for 15 s).
 
      Relay.host(code, onLink) -> { stop() }   the host: onLink(link) per guest
      Relay.join(code) -> link                 a guest
@@ -28,7 +30,7 @@
   'use strict';
   const subtle = window.crypto && crypto.subtle;
   const te = new TextEncoder(), td = new TextDecoder();
-  const HB = 5000, DEAD = 90000, GONE = 15000, GAP = 3000, SYN_EVERY = 1500, SYN_FOR = 15000;
+  const HB = 5000, DEAD = 90000, GONE = 15000, GAP = 15000, RESEND = 1200, SYN_EVERY = 1500, SYN_FOR = 15000;
   const ID = /^[a-z0-9]{12}$/;
   const at = (code, ...p) => Net.PRE + 'rl/' + code + '/' + p.join('/');
   const live = new Set();                                   // every open link, to say goodbye when the page goes
@@ -59,23 +61,34 @@
     };
   }
 
-  /* one link: out(frame) sends a frame to the other side; done() tidies up when it closes */
+  /* one link: out(frame) sends a frame to the other side; done() tidies up when it closes.
+     The brokers can drop a message now and then, so every 'd' frame waits in `unsent` until the other side
+     confirms it ('rx' frames and heartbeats carry `a`: everything up to a has arrived), and is sent again if
+     no confirmation comes within RESEND. */
   function Link(peer, out, done) {
     const hs = {};
     const L = {
-      peer, open: false, key: null, seq: 0, next: 1, held: new Map(), gapAt: 0, heard: Date.now(), chain: Promise.resolve(), closed: false,
+      peer, open: false, key: null, seq: 0, next: 1, held: new Map(), unsent: new Map(), gapAt: 0, heard: Date.now(), chain: Promise.resolve(), closed: false, rxT: null,
       on(ev, fn) { (hs[ev] = hs[ev] || []).push(fn); return L; },
       emit(ev, x) { for (const fn of hs[ev] || []) { try { fn(x); } catch (e) { console.error(e); } } },
       send(msg) {
         if (!L.open) return;
         const n = ++L.seq, iv = crypto.getRandomValues(new Uint8Array(12));
-        subtle.encrypt({ name: 'AES-GCM', iv }, L.key, te.encode(JSON.stringify(msg)))
-          .then(ct => { if (!L.closed) out({ k: 'd', n, iv: b64(iv), ct: b64(ct) }); }).catch(() => {});
+        subtle.encrypt({ name: 'AES-GCM', iv }, L.key, te.encode(JSON.stringify(msg))).then(ct => {
+          if (L.closed) return;
+          const fr = { k: 'd', n, iv: b64(iv), ct: b64(ct) };
+          L.unsent.set(n, { fr, at: Date.now() });
+          if (L.unsent.size > 400) L.unsent.delete(L.unsent.keys().next().value);
+          out(fr);
+        }).catch(() => {});
       },
+      /* everything up to this number has arrived */
+      upTo() { let n = L.next - 1; while (L.held.has(n + 1)) n++; return n; },
+      beat() { out({ k: 'hb', a: L.upTo() }); },
       close() { L.end(true); },
       end(tell) {
         if (L.closed) return;
-        L.closed = true; L.open = false; live.delete(L);
+        L.closed = true; L.open = false; live.delete(L); clearTimeout(L.rxT);
         if (tell) out({ k: 'fin' });
         done(); L.emit('close');
       },
@@ -83,7 +96,10 @@
         if (fr.k === 'gone') { L.suspect = true; return; }
         L.heard = Date.now(); L.suspect = false;
         if (fr.k === 'fin') { L.end(false); return; }
-        if (fr.k !== 'd' || !L.key || typeof fr.n !== 'number' || fr.n < L.next || L.held.has(fr.n) || L.held.size > 500) return;
+        if (typeof fr.a === 'number') for (const n of [...L.unsent.keys()]) if (n <= fr.a) L.unsent.delete(n);
+        if (fr.k !== 'd' || !L.key || typeof fr.n !== 'number') return;
+        if (!L.rxT) L.rxT = setTimeout(() => { L.rxT = null; if (!L.closed) out({ k: 'rx', a: L.upTo() }); }, 120);   // (copies too: our last 'rx' may have been lost)
+        if (fr.n < L.next || L.held.has(fr.n) || L.held.size > 500) return;
         L.held.set(fr.n, fr);
         L.chain = L.chain.then(L.drain);
       },
@@ -95,9 +111,11 @@
           if (!L.closed) L.emit('data', msg);
         }
       },
-      /* every second: a message lost on both brokers mustn't stall the rest; a silent link is a closed one */
+      /* twice a second: send again what hasn't been confirmed; a message that never comes mustn't stall the
+         rest for ever; a silent link is a closed one */
       tick(now) {
         if (now - L.heard > (L.suspect ? GONE : DEAD)) { L.end(false); return; }
+        for (const u of L.unsent.values()) if (now - u.at > RESEND) { u.at = now; out(u.fr); }
         if (L.held.size && !L.held.has(L.next)) {
           if (!L.gapAt) L.gapAt = now;
           else if (now - L.gapAt > GAP) { L.next = Math.min(...L.held.keys()); L.gapAt = 0; L.chain = L.chain.then(L.drain); }
@@ -113,8 +131,8 @@
   Relay.host = (code, onLink) => {
     const links = new Map();                                // link id -> link (or 'wait' while its key is made)
     let C = null, stopped = false;
-    const tick = setInterval(() => { const now = Date.now(); for (const L of links.values()) if (L !== 'wait') L.tick(now); }, 1000);
-    const hb = setInterval(() => { for (const [f, L] of links) if (L !== 'wait' && L.open) C.pub(at(code, 'g', f), { k: 'hb' }); }, HB);
+    const tick = setInterval(() => { const now = Date.now(); for (const L of links.values()) if (L !== 'wait') L.tick(now); }, 500);
+    const hb = setInterval(() => { for (const L of links.values()) if (L !== 'wait' && L.open) L.beat(); }, HB);
     async function got(t, fr) {
       const f = fr.f; if (typeof f !== 'string' || !ID.test(f)) return;
       const L = links.get(f);
@@ -156,11 +174,13 @@
     async function got(t, fr) {
       if (L.closed) return;
       if (fr.k === 'ack') {
-        if (L.open || L.key || !okPk(fr.pk)) return;
-        try { L.key = await sharedKey(kp, fr.pk); } catch (e) { return; }
+        if (L.open || L.opening || !okPk(fr.pk)) return;         // (it comes from both brokers)
+        L.opening = true;
+        try { L.key = await sharedKey(kp, fr.pk); } catch (e) { L.opening = false; return; }
+        if (L.closed) return;
         L.open = true; L.heard = Date.now();
-        hbT = setInterval(() => L.open && C.pub(at(code, 'h'), { f, k: 'hb' }), HB);
-        tickT = setInterval(() => L.tick(Date.now()), 1000);
+        hbT = setInterval(() => L.open && L.beat(), HB);
+        tickT = setInterval(() => L.tick(Date.now()), 500);
         L.emit('open');
         return;
       }
