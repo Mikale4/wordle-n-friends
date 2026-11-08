@@ -326,6 +326,7 @@
       if (!cls) return;
       Music.urgent(false); Music.duck(false);
       const t = /\b(title|login)\b/.test(cls) ? 'title'
+        : /\barcade\b/.test(cls) ? (/\bplay\b/.test(cls) ? (/\bonlinegame\b/.test(cls) ? 'race' : 'think') : 'menu')
         : /\bonline\b/.test(cls) ? (/\bgame\b/.test(cls) ? (/\branked\b/.test(cls) ? 'ranked' : 'race') : 'lobby')
           : /\bplay\b/.test(cls) ? (/mode-(blitz|cpu)\b/.test(cls) ? 'race' : 'think') : 'menu';
       Music.play(t);

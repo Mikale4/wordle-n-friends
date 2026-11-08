@@ -177,14 +177,18 @@
   /* ------------------------------------------------------------ challenging */
   Social.challenge = id => {
     if (!Net.online(id)) { Menu.toast(Net.nameOf(id) + ' isn\'t online.', 'bad'); return; }
-    const o = { ranked: false, mode: 'race', len: 5, rounds: 3 };
+    const o = { ranked: false, game: 'wordle', mode: 'race', len: 5, rounds: 3, opts: {} };
     const draw = () => {
       body.innerHTML = '';
       const seg = (label, val, opts, fn) => el('div', { class: 'seg' }, el('span', null, label), el('div', null, ...opts.map(([v, t]) => el('button', { class: String(val) === String(v) ? 'on' : '', onclick: () => { fn(v); draw(); } }, t))));
+      const g = o.game !== 'wordle' && window.Games ? Games.get(o.game) : null;
+      if (g) o.opts = Games.opts(g, o.opts);
       body.append(
         el('div', { class: 'chalwho' }, Menu.avatar(id, Net.nameOf(id), 'lg'), el('div', null, el('h3', null, Net.nameOf(id)), el('small', null, statusOf(id).text))),
+        window.Games ? seg('GAME', o.game, [['wordle', 'Wordle'], ...Games.list.map(x => [x.id, x.name])], v => { o.game = v; o.opts = {}; if (v !== 'wordle') o.ranked = false; }) : null,
+        g ? el('div', null, ...(g.options || []).map(op => seg(op.label, o.opts[op.key], op.values, v => { o.opts[op.key] = op.values.find(x => String(x[0]) === String(v))[0]; })), el('p', { class: 'small muted' }, g.blurb + '.')) :
         seg('MATCH', o.ranked, [[false, 'Casual'], [true, 'Ranked']], v => { o.ranked = v === true || v === 'true'; }),
-        o.ranked ? el('p', { class: 'small muted' }, 'Ranked: a 1v1 race over three 5-letter words. Both ratings move.') : el('div', null,
+        g ? null : o.ranked ? el('p', { class: 'small muted' }, 'Ranked: a 1v1 race over three 5-letter words. Both ratings move.') : el('div', null,
           seg('MODE', o.mode, [['race', 'Race'], ['blitz', 'Blitz'], ['quad', 'Quad']], v => { o.mode = v; }),
           o.mode === 'quad' ? null : seg('LETTERS', o.len, Engine.LENS.map(n => [n, String(n)]), v => { o.len = +v; }),
           seg('ROUNDS', o.rounds, [[1, '1'], [3, '3'], [5, '5']], v => { o.rounds = +v; })));
@@ -258,7 +262,7 @@
       }
     };
     const onlineN = Object.keys(s.friends).filter(id => Net.online(id)).length;
-    App.screen(el('div', { class: 'screen friends' }, topbar('FRIENDS', () => Menu.hub()),
+    App.screen(el('div', { class: 'screen friends' }, topbar('FRIENDS', () => Menu.home()),
       el('div', { class: 'panel fpanel' },
         el('div', { class: 'tabs' }, ...[['friends', 'FRIENDS · ' + onlineN + '/' + Object.keys(s.friends).length], ['requests', 'REQUESTS' + (nIn ? ' (' + nIn + ')' : '')], ['add', 'ADD FRIEND'], ['blocked', 'BLOCKED']]
           .map(([k, t]) => el('button', { class: tab === k ? 'on' : '', onclick: () => Social.friends(k) }, t))),
@@ -320,7 +324,7 @@
         Menu.avatar(k, s.friends[k].n), el('span', { class: 'convt' }, el('b', null, s.friends[k].n), el('small', null, statusOf(k).text))))) : el('p', { class: 'empty' }, 'Add friends first (or open someone\'s player card in the lobby).')] });
     };
     const draw = () => { if (!document.body.contains(list)) { offs.forEach(f => f()); return; } const typing = document.activeElement === box; drawList(); drawThread(); if (typing) box.focus(); };
-    App.screen(el('div', { class: 'screen messages' + (want ? ' has' : '') }, topbar('MESSAGES', () => (openConvo && innerWidth < 760 ? Social.messages() : Menu.hub())),
+    App.screen(el('div', { class: 'screen messages' + (want ? ' has' : '') }, topbar('MESSAGES', () => (openConvo && innerWidth < 760 ? Social.messages() : Menu.home())),
       el('div', { class: 'panel msgpanel' }, list, thread)));
     openConvo = want;
     const offs = [Social.on('change', draw), Net.on('players', draw)];

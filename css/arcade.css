@@ -1,0 +1,82 @@
+/* arcade.css -- the game picker, each game's menu, and the frame around the other games' boards (arcade.js, match.js) */
+
+/* ---- the picker: Wordle big in the middle, the others around it */
+.picker { min-height: 100vh; display: flex; flex-direction: column; }
+.pickgrid { flex: 1; display: grid; gap: 18px; padding: 22px 16px 10px; max-width: 1180px; width: 100%; margin: 0 auto;
+  grid-template-columns: 1fr minmax(320px, 1.5fr) 1fr; grid-template-areas: "l m r" ". b ."; align-items: center; }
+.pick { position: relative; cursor: pointer; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 18px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px;
+  transition: transform .15s, border-color .15s, box-shadow .15s; overflow: hidden; }
+.pick:hover, .pick:focus-visible { transform: translateY(-4px); border-color: var(--accent2); box-shadow: var(--shadow); outline: none; }
+.pick h2 { font: 700 22px var(--font); letter-spacing: .1em; margin: 4px 0 0; color: var(--text); }
+.pick p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; max-width: 34ch; }
+.pickstat { color: var(--faint); font: 800 11px var(--font); letter-spacing: .1em; text-transform: uppercase; margin-top: 2px; }
+.pick.l { grid-area: l; } .pick.r { grid-area: r; } .pick.b { grid-area: b; } .pick.main { grid-area: m; }
+.pick.main { padding: 34px 24px 26px; min-height: 330px; justify-content: center; border-width: 2px; border-color: color-mix(in srgb, var(--hit) 55%, var(--line));
+  background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--hit) 22%, var(--panel)), var(--panel) 70%); }
+.pick.main h2 { font-size: 30px; }
+.pick.main p { font-size: 15px; }
+.pick.side { min-height: 250px; justify-content: center; }
+.pick.b { min-height: 0; flex-direction: row; text-align: left; gap: 16px; justify-content: flex-start; padding: 14px 20px; }
+.pick.b .pickpic { flex: none; } .pick.b > :not(.pickpic) { align-self: center; }
+.pick.b h2 { margin: 0; }
+.pick-runes { background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent) 24%, var(--panel)), var(--panel) 70%); }
+.pick-wright { background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--gold) 18%, var(--panel)), var(--panel) 70%); }
+.pick-chess { background: linear-gradient(90deg, color-mix(in srgb, var(--hot) 14%, var(--panel)), var(--panel) 60%); }
+.pickfoot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 16px 22px; max-width: 1180px; width: 100%; margin: 0 auto; }
+.pickfoot > small { color: var(--muted); font-weight: 700; }
+
+/* the pictures */
+.pickpic { display: flex; align-items: center; justify-content: center; min-height: 70px; }
+.tilerow.pickwordle .tile { width: 46px; height: 46px; font-size: 26px; }
+.pickart { display: grid; gap: 4px; }
+.pickart span { display: flex; align-items: center; justify-content: center; font: 700 16px var(--font); border-radius: 7px; }
+.runesart { grid-template-columns: repeat(3, 30px); }
+.runesart span { height: 30px; background: var(--panel3); color: var(--muted); border: 1px solid var(--line); }
+.runesart span.on { background: color-mix(in srgb, var(--accent) 70%, var(--panel3)); color: #fff; border-color: var(--accent2); box-shadow: 0 0 12px color-mix(in srgb, var(--accent2) 60%, transparent); }
+.wrightart { grid-template-columns: repeat(5, 24px); }
+.wrightart span { height: 24px; font-size: 13px; background: color-mix(in srgb, var(--panel3) 60%, transparent); }
+.wrightart span.on { background: #f3e2b8; color: #3a2a12; box-shadow: 0 2px 0 #c9a96a; }
+.chessart span { font: 64px/1 'Segoe UI Symbol', 'Noto Sans Symbols 2', 'DejaVu Sans', serif; color: var(--text); text-shadow: 0 3px 0 color-mix(in srgb, var(--hot) 60%, transparent); }
+
+@media (max-width: 860px) {
+  .pickgrid { grid-template-columns: 1fr 1fr; grid-template-areas: "m m" "l r" "b b"; align-items: stretch; }
+  .pick.main { min-height: 260px; }
+  .pick.side { min-height: 0; }
+}
+@media (max-width: 520px) {
+  .pickgrid { grid-template-columns: 1fr; grid-template-areas: "m" "l" "r" "b"; gap: 12px; padding-top: 14px; }
+  .pick.main { padding: 24px 16px 20px; min-height: 0; }
+  .tilerow.pickwordle .tile { width: 38px; height: 38px; font-size: 21px; }
+  .pick.side, .pick.b { flex-direction: row; text-align: left; justify-content: flex-start; gap: 14px; padding: 14px 16px; }
+  .pick.side .pickpic, .pick.b .pickpic { flex: none; transform: scale(.8); margin: -6px; }
+  .pick.side h2, .pick.b h2 { font-size: 18px; margin: 0; }
+}
+
+/* ---- a game's menu */
+.ghubgrid { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 16px; padding: 18px 16px 30px; max-width: 1180px; width: 100%; margin: 0 auto; align-items: start; }
+.ghero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ghero h2 { font: 700 26px var(--font); letter-spacing: .1em; margin: 6px 0 0; }
+.ghero p { color: var(--muted); margin: 0; }
+.gstats { display: grid; gap: 8px; width: 100%; margin-top: 8px; }
+.gstats > div { display: grid; grid-template-columns: 70px 1fr auto; align-items: center; gap: 8px; text-align: left; background: var(--panel2); border-radius: 12px; padding: 8px 12px; }
+.gstats small { font: 800 10px var(--font); letter-spacing: .1em; color: var(--faint); }
+.gstats span { color: var(--muted); font-size: 13px; }
+.gcpu h3, .gonline h3 { margin: 0 0 8px; font-size: 14px; letter-spacing: .12em; color: var(--muted); }
+.gcpu .seg { grid-template-columns: 120px 1fr; }
+.gcpu > .btn, .gonline > .btn { margin-top: 10px; }
+.gonline { display: flex; flex-direction: column; gap: 8px; }
+.gonline .btn small { display: block; font-weight: 600; opacity: .8; font-size: 11px; letter-spacing: 0; text-transform: none; }
+.gfriends { display: flex; flex-direction: column; gap: 6px; margin: 4px 0; }
+.gfriends > small { font: 800 10px var(--font); letter-spacing: .12em; color: var(--faint); }
+@media (max-width: 960px) { .ghubgrid { grid-template-columns: 1fr 1fr; } .ghero { grid-column: 1 / -1; } }
+@media (max-width: 620px) { .ghubgrid { grid-template-columns: 1fr; padding: 12px 12px 24px; } .gcpu .seg { grid-template-columns: 1fr; } }
+
+/* ---- the frame around a game's board */
+.screen.arcade.play { min-height: 100vh; display: flex; flex-direction: column; }
+.gamearea { flex: 1; display: flex; flex-direction: column; min-height: 0; width: 100%; }
+.restext { text-align: center; color: var(--muted); font-weight: 700; margin: 0 0 10px; }
+.pill.game { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent2); }
+.pill.game.g-wordle { background: color-mix(in srgb, var(--hit) 22%, transparent); color: var(--hit); }
+.gchatpop .chatlog { height: min(50vh, 340px); overflow-y: auto; margin-bottom: 10px; }
+.gchatpop .quickchat { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.gchatpop .quickchat button { border: 0; background: var(--panel2); color: var(--muted); padding: 6px 10px; border-radius: 9px; font: 700 12px var(--font); }

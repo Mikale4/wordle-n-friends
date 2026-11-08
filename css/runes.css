@@ -1,0 +1,155 @@
+/* ============================================================================
+   runes.css -- Runecasters: the scoreboard, the 5x5 board of letter tiles with
+   their glowing runes and mana crystals, the trace line, the spell bar.
+   Tiles reuse .tile from style.css (the Wordle look) and grow from there; sizes
+   inside the board are in cqw (hundredths of the board's width), so the board
+   scales as one piece from a 360 px phone to a desktop.
+   ========================================================================== */
+.rc { --r2: #2dd4bf; --r3: #f472b6; --rw: var(--gold); --mana: #60a5fa;
+  /* the board: the width there is, at most 470 px, and short enough to leave room for the rest on a phone */
+  --bs: min(100%, 470px, max(240px, calc(100vh - 380px)));
+  width: 100%; max-width: 540px; margin: 0 auto; padding: 8px 12px 16px; display: flex; flex-direction: column; align-items: center; gap: 7px;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+@supports (height: 100dvh) { .rc { --bs: min(100%, 470px, max(240px, calc(100dvh - 380px))); } }
+:root[data-theme=light] .rc { --r2: #0d9488; --r3: #db2777; --rw: #d97706; --mana: #2563eb; }
+.rc [hidden] { display: none !important; }
+
+/* ---------------------------------------------------------------- scoreboard */
+.rc-players { display: flex; gap: 6px; width: 100%; overflow-x: auto; scrollbar-width: none; padding: 3px 2px; }
+.rc-players::-webkit-scrollbar { display: none; }
+.rc-p { flex: 1 1 0; min-width: 84px; display: flex; flex-direction: column; gap: 1px; padding: 5px 9px 6px; border-radius: 12px; background: var(--panel); border: 2px solid var(--line); transition: border-color .2s, box-shadow .2s; }
+.rc-p.on { border-color: var(--accent2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent); }
+.rc-p.win { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--panel)); }
+.rc-pn { display: flex; align-items: center; gap: 5px; font: 800 12px var(--font); color: var(--muted); min-width: 0; }
+.rc-pn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.rc-pn .mtag { flex: none; padding: 2px 5px; }
+.rc-p.me .rc-pn { color: var(--accent2); }
+.rc-pr { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.rc-ps { display: inline-block; font: 700 21px/1.1 var(--display); }
+.rc-p.up .rc-ps { animation: rcbump .6s ease; }
+.rc-pm { display: inline-flex; align-items: center; gap: 5px; font: 800 12px var(--font); color: var(--mana); }
+.rc-pm i, .rc-pips i { display: inline-block; width: 8px; height: 8px; transform: rotate(45deg); border-radius: 2px; background: linear-gradient(135deg, #e0f2fe, var(--mana)); box-shadow: 0 0 5px var(--mana); }
+.rc-pb { font: 700 11px var(--display); letter-spacing: .08em; color: var(--gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@keyframes rcbump { 40% { transform: scale(1.28); color: var(--gold); } }
+
+/* ---------------------------------------------------------------- status lines */
+.rc-status { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.rc-turn { flex: 1; min-width: 0; font: 700 19px var(--display); letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rc-turn.me { color: var(--good); }
+.rc-clock { font: 700 19px var(--display); letter-spacing: .04em; min-width: 46px; text-align: right; }
+.rc-clock.low { color: var(--bad); }
+.rc .rc-bar { width: 100%; height: 5px; margin: 0; }
+.rc-last { width: 100%; min-height: 18px; font: 600 13px/18px var(--font); color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rc-last b { color: var(--text); font: 700 14px var(--display); letter-spacing: .12em; }
+.rc-last em { font-style: normal; font-weight: 800; color: var(--good); }
+.rc-last i { font-style: normal; font-weight: 800; color: var(--mana); }
+.rc-word { width: 100%; min-height: 36px; display: flex; align-items: center; justify-content: center; gap: 10px; text-align: center; }
+.rc-w { font: 700 24px/1 var(--display); letter-spacing: .16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.rc-word.no .rc-w { color: var(--muted); }
+.rc-pts { flex: none; font: 800 13px var(--font); padding: 4px 9px; border-radius: 10px; background: var(--panel3); color: var(--muted); }
+.rc-word.ok .rc-pts { background: var(--hit); color: #fff; }
+.rc-tip { font: 600 14px var(--font); color: var(--muted); }
+.rc-word.bad .rc-tip { color: var(--bad); font-weight: 800; }
+.rc-word.gold .rc-tip { color: var(--gold); font-weight: 800; }
+
+/* ---------------------------------------------------------------- the board */
+.rc-board { position: relative; flex: none; width: var(--bs); aspect-ratio: 1 / 1; container-type: inline-size; }
+.rc-grid { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr); touch-action: none; }
+.rc-grid.shake { animation: shake .4s; }
+.rc-cell { padding: 4.5%; min-width: 0; min-height: 0; }
+.rc .rc-tile { position: relative; width: 100%; height: 100%; border-radius: 20%; font-size: 9.6cqw; line-height: 1;
+  box-shadow: inset 0 -.7cqw 0 rgba(0, 0, 0, .16); transition: transform .12s, background-color .15s, border-color .15s, color .15s; }
+.rc-l { display: block; transform: translateY(-3%); pointer-events: none; }
+.rc-l small { font-size: .55em; text-transform: none; margin-left: .03em; }
+.rc-v { position: absolute; right: 9%; bottom: 7%; font: 800 2.5cqw/1 var(--font); font-style: normal; color: var(--muted); pointer-events: none; }
+.rc-ord { position: absolute; left: 9%; bottom: 7%; font: 800 2.4cqw/1 var(--font); font-style: normal; color: var(--gold); pointer-events: none; }
+@media (hover: hover) { .rc.can .rc-tile:hover, .rc.tm .rc-tile:hover { border-color: var(--tilef); } }
+
+/* the runes: a glowing ring (::before, so it can pulse while the tile itself animates) and a sigil in the corner */
+.rc-tile.r2 { --rc: var(--r2); } .rc-tile.r3 { --rc: var(--r3); } .rc-tile.rw { --rc: var(--rw); }
+.rc .rc-tile.r2, .rc .rc-tile.r3, .rc .rc-tile.rw { border-color: var(--rc); }
+.rc-tile.r2::before, .rc-tile.r3::before, .rc-tile.rw::before { content: ''; position: absolute; inset: -2px; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 1.6cqw color-mix(in srgb, var(--rc) 75%, transparent), inset 0 0 2cqw color-mix(in srgb, var(--rc) 45%, transparent); animation: rcglow 2.6s ease-in-out infinite; }
+.rc-tile.rw::after { content: ''; position: absolute; inset: 9%; border-radius: 14%; pointer-events: none; border: .4cqw dashed color-mix(in srgb, var(--rw) 70%, transparent); }
+.rc-rune { position: absolute; left: 7%; top: 7%; padding: .45cqw .75cqw; border-radius: 1.1cqw; font: 800 2.3cqw/1 var(--font); font-style: normal; letter-spacing: .02em;
+  color: #11101a; background: var(--rc); box-shadow: 0 0 1.4cqw var(--rc); pointer-events: none; }
+@keyframes rcglow { 50% { opacity: .4; } }
+
+/* mana crystals */
+.rc-crys { position: absolute; right: 11%; top: 11%; width: 2.7cqw; height: 2.7cqw; transform: rotate(45deg); border-radius: .5cqw; pointer-events: none;
+  background: linear-gradient(135deg, #e0f2fe, var(--mana) 60%, #1d4ed8); box-shadow: 0 0 1.6cqw var(--mana); animation: rctwinkle 2.8s ease-in-out infinite; }
+@keyframes rctwinkle { 50% { box-shadow: 0 0 .6cqw var(--mana); filter: brightness(.85); } }
+
+/* tracing, a scried word, transmuting */
+.rc .rc-tile.sel { background: linear-gradient(180deg, var(--accent2), var(--accent)); border-color: var(--accent2); color: #fff; transform: scale(1.06); z-index: 1; }
+.rc .rc-tile.sel.ok { background: linear-gradient(180deg, #4ade80, var(--hit)); border-color: #4ade80; }
+.rc .rc-tile.sel .rc-v { color: rgba(255, 255, 255, .85); }
+.rc .rc-tile.hint { outline: .55cqw dashed var(--gold); outline-offset: .4cqw; }
+.rc.tm .rc-tile { cursor: pointer; }
+.rc .rc-tile.tmsel { border-color: var(--hot); box-shadow: 0 0 0 .7cqw color-mix(in srgb, var(--hot) 45%, transparent); }
+
+/* the last cast: its tiles flash on their old letters, then new letters drop in */
+.rc .rc-tile.cast { background: linear-gradient(180deg, #fde68a, var(--gold)); border-color: var(--gold); color: #1d1730; animation: rcpulse .9s ease; }
+.rc .rc-tile.cast .rc-v { color: #1d1730; }
+.rc .rc-tile.fresh { animation: rcdrop .45s cubic-bezier(.2, 1.3, .4, 1) both; }
+.rc .rc-tile.spin { animation: rcspin .55s ease both; animation-delay: calc(var(--i) * 12ms); }
+.rc .rc-tile.morph { animation: rcmorph .6s ease; }
+@keyframes rcpulse { 30% { transform: scale(1.1); } }
+@keyframes rcdrop { from { transform: translateY(-45%) scale(.5); opacity: 0; } }
+@keyframes rcspin { 50% { transform: rotateY(90deg) scale(.85); } }
+@keyframes rcmorph { 40% { transform: scale(1.18) rotate(-6deg); filter: brightness(1.6); } }
+
+/* the lines over the tiles (the SVG's units are tiles: 0-5) */
+.rc-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; overflow: visible; }
+.rc-lines polyline { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.rc-lines .tr { stroke: #fff; stroke-width: .13; opacity: .55; }
+.rc-lines .tr.ok { stroke: #dcfce7; opacity: .7; }
+.rc-lines .hl { stroke: var(--gold); stroke-width: .07; stroke-dasharray: .1 .12; opacity: .85; }
+.rc-lines .cl { stroke: var(--gold); stroke-width: .17; opacity: 0; }
+.rc-lines .cl.go { stroke-dasharray: var(--len) var(--len); animation: rcdraw 1.1s ease-out both; }
+@keyframes rcdraw { from { stroke-dashoffset: var(--len); opacity: .95; } 55% { stroke-dashoffset: 0; opacity: .95; } to { stroke-dashoffset: 0; opacity: 0; } }
+
+/* notes over the board */
+.rc-notes { position: absolute; inset: 0; z-index: 4; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+.rc-note { max-width: 94%; background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 12px; font: 700 15px var(--font); box-shadow: var(--shadow);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: rcnote 1.7s ease both; }
+.rc-note.big { font: 700 clamp(18px, 6cqw, 26px) var(--display); letter-spacing: .08em; background: linear-gradient(180deg, #fde68a, var(--gold)); color: #1d1730; }
+.rc-note.me { background: var(--accent); color: #fff; font: 700 20px var(--display); letter-spacing: .06em; }
+@keyframes rcnote { from { opacity: 0; transform: translateY(12px) scale(.9); } 15% { opacity: 1; transform: none; } 75% { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-16px); } }
+
+/* the letter picker for Transmute */
+.rc-pick { position: absolute; inset: 3%; z-index: 5; display: flex; flex-direction: column; gap: 2.4cqw; padding: 3cqw; border-radius: 4cqw;
+  background: color-mix(in srgb, var(--panel) 97%, transparent); border: 1px solid var(--line); box-shadow: var(--shadow); animation: pop .2s; }
+.rc-pickh { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: 700 clamp(14px, 4.4cqw, 19px) var(--display); letter-spacing: .05em; }
+.rc-pickg { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 1.6cqw; }
+.rc-pickg button { position: relative; border: 0; border-radius: 2.2cqw; padding: 0; background: var(--keybg); color: var(--keytext); font: 700 5.8cqw var(--display);
+  box-shadow: inset 0 -.6cqw 0 rgba(0, 0, 0, .25); touch-action: manipulation; }
+.rc-pickg button em { font-style: normal; font-size: .6em; }
+.rc-pickg button small { position: absolute; right: 9%; bottom: 7%; font: 800 2.3cqw/1 var(--font); opacity: .75; }
+.rc-pickg button:hover { background: var(--accent); color: #fff; }
+.rc-pickg button.off { opacity: .3; pointer-events: none; }
+
+/* ---------------------------------------------------------------- buttons */
+.rc-acts { width: 100%; display: grid; grid-template-columns: 1fr 1.7fr 1fr; gap: 8px; margin-top: 3px; }
+.rc-acts .btn { padding: 10px 6px; min-height: 50px; touch-action: manipulation; }
+.rc-cast small { min-height: 13px; }
+.rc-cast.go { animation: rcready 1.4s ease-in-out infinite; }
+@keyframes rcready { 50% { filter: brightness(1.2); } }
+.rc-mana { width: 100%; display: flex; align-items: center; gap: 8px; font: 800 11px var(--font); letter-spacing: .12em; color: var(--muted); }
+.rc-pips { display: flex; gap: 6px; flex: 1; padding-left: 2px; }
+.rc-pips i { width: 9px; height: 9px; background: var(--panel3); box-shadow: none; }
+.rc-pips i.on { background: linear-gradient(135deg, #e0f2fe, var(--mana)); box-shadow: 0 0 6px var(--mana); }
+.rc-mana b { color: var(--mana); font-size: 13px; letter-spacing: .04em; }
+.rc-spells { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rc-spells .btn { padding: 8px 4px; font-size: 13px; letter-spacing: .03em; touch-action: manipulation; }
+.rc-spells .btn small { color: var(--mana); opacity: 1; font-weight: 800; }
+.rc.watch .rc-acts, .rc.watch .rc-mana, .rc.watch .rc-spells, .rc.over .rc-acts, .rc.over .rc-mana, .rc.over .rc-spells { display: none; }
+
+@media (max-width: 400px) {
+  .rc { padding: 6px 10px 12px; gap: 6px; }
+  .rc-turn, .rc-clock { font-size: 17px; }
+  .rc-w { font-size: 21px; letter-spacing: .12em; }
+  .rc-p { min-width: 78px; padding: 4px 7px 5px; }
+  .rc-ps { font-size: 19px; }
+  .rc-spells .btn { font-size: 12px; }
+}

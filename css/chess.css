@@ -1,0 +1,123 @@
+/* ============================================================================
+   chess.css -- Chess: the two player bars (name, captured pieces, clock), the
+   board (8 x 8, scaled to the space there is), the promotion picker, the
+   status box with draw and resign, and the move list. The pieces are inline
+   SVG drawn by js/chess.js and coloured here. On wide screens the status and
+   the moves sit to the right of the board; on phones they go under it.
+   Sizes inside the board are in cqw (hundredths of the board's width).
+   ========================================================================== */
+.chess { --chl: #ddd3f6; --chd: #8670c4; --ch-last: rgba(245, 197, 66, .45); --ch-sel: rgba(52, 211, 153, .55); --ch-dot: rgba(28, 18, 56, .3);
+  /* the board: the width there is, and short enough to leave room for the two bars and the top bar */
+  --bs: min(100%, 560px, max(260px, calc(100vh - 190px)));
+  width: 100%; padding: 10px 10px 18px; display: flex; justify-content: center;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+@supports (height: 100dvh) { .chess { --bs: min(100%, 560px, max(260px, calc(100dvh - 190px))); } }
+:root[data-theme=light] .chess { --chl: #f1ecfd; --chd: #9b85d8; --ch-dot: rgba(40, 24, 90, .26); }
+.chess [hidden] { display: none !important; }
+.ch-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 1120px; }
+.ch-game { width: var(--bs); flex: none; display: flex; flex-direction: column; gap: 6px; }
+.ch-side { width: var(--bs); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+@media (min-width: 900px) {
+  .chess { --bs: min(calc(100% - 330px), 720px, max(320px, calc(100vh - 170px))); padding-top: 14px; }
+  @supports (height: 100dvh) { .chess { --bs: min(calc(100% - 330px), 720px, max(320px, calc(100dvh - 170px))); } }
+  .ch-wrap { flex-direction: row; align-items: stretch; justify-content: center; gap: 18px; }
+  .ch-side { width: 300px; flex: none; }
+}
+
+/* ---------------------------------------------------------------- the player bars */
+.ch-bar { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 4px 5px 4px 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); min-width: 0; transition: border-color .2s, box-shadow .2s; }
+.ch-bar.turn { border-color: var(--accent2); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+.ch-dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.ch-dot.w { background: #fbf8ff; box-shadow: 0 0 0 1.5px #2a2140; }
+.ch-dot.b { background: #2c2442; box-shadow: 0 0 0 1.5px #b9addf; }
+.ch-name { font: 700 15px var(--display); letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+.ch-caps { display: flex; align-items: center; flex: 1 1 auto; min-width: 0; height: 20px; overflow: hidden; padding-left: 2px; }
+.ch-caps svg { width: 19px; height: 19px; flex: none; margin-right: -7px; }
+.ch-adv { font: 800 12px var(--font); color: var(--muted); flex: none; }
+.ch-clock { flex: none; font: 700 19px/1 var(--display); letter-spacing: .03em; font-variant-numeric: tabular-nums; padding: 7px 9px; border-radius: 9px; background: var(--panel2); color: var(--muted); min-width: 72px; text-align: center; transition: background .2s, color .2s; }
+.ch-clock.run { background: var(--text); color: var(--bg); }
+.ch-clock.low { background: var(--bad); color: #fff; }
+
+/* ---------------------------------------------------------------- the board */
+.ch-bwrap { position: relative; width: 100%; aspect-ratio: 1; border-radius: 8px; overflow: hidden; box-shadow: var(--shadow), 0 0 0 1px var(--line); container-type: inline-size; }
+.ch-board { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); width: 100%; height: 100%; touch-action: none; cursor: pointer; }
+.ch-sq { position: relative; min-width: 0; min-height: 0; }
+.ch-sq.l { background: var(--chl); }
+.ch-sq.d { background: var(--chd); }
+.ch-sq::before, .ch-sq::after { content: ''; position: absolute; pointer-events: none; }
+.ch-sq::before { inset: 0; }
+.ch-sq.last::before { background: var(--ch-last); }
+.ch-sq.sel::before { background: var(--ch-sel); }
+.ch-sq.chk::before { background: radial-gradient(circle, rgba(251, 70, 100, .95) 0 22%, rgba(251, 70, 100, .55) 45%, transparent 72%); }
+/* (the hover ring first, so the drop target's stronger ring wins) */
+@media (hover: hover) { .ch-sq:hover::before { box-shadow: inset 0 0 0 max(2px, .4cqw) rgba(255, 255, 255, .35); } }
+.ch-sq.hov::before { box-shadow: inset 0 0 0 max(3px, .7cqw) rgba(255, 255, 255, .85); }
+.ch-sq.tgt::after { left: 50%; top: 50%; width: 30%; height: 30%; transform: translate(-50%, -50%); border-radius: 50%; background: var(--ch-dot); z-index: 2; }
+.ch-sq.tgt.cap::after { width: 94%; height: 94%; background: transparent; box-shadow: inset 0 0 0 max(3px, .9cqw) var(--ch-dot); }
+.ch-sq.cur { z-index: 2; box-shadow: inset 0 0 0 max(3px, .6cqw) var(--hot); }
+.ch-p { position: absolute; inset: 0; z-index: 1; }
+.ch-p svg { width: 100%; height: 100%; display: block; }
+.ch-sq.lift .ch-p { opacity: .3; }
+.ch-co { position: absolute; z-index: 1; font-family: var(--font); font-weight: 800; font-size: max(9px, 2.3cqw); line-height: 1; pointer-events: none; }
+.ch-sq.l .ch-co { color: var(--chd); }
+.ch-sq.d .ch-co { color: var(--chl); }
+.ch-co.r { top: 4%; left: 5%; }
+.ch-co.f { bottom: 4%; right: 6%; }
+
+/* the pieces: two flat tones with an outline, the same in both themes */
+svg.ch-pc { stroke-width: 4; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 1.5px 1px rgba(0, 0, 0, .28)); }
+svg.ch-pc.w { fill: #fbf8ff; stroke: #2a2140; }
+svg.ch-pc.b { fill: #2c2442; stroke: #0f0b1a; }
+svg.ch-pc .d { fill: none; }
+svg.ch-pc.w .d { stroke: #2a2140; }
+svg.ch-pc.b .d { stroke: #cfc5f2; }
+svg.ch-pc .e { stroke: none; }
+svg.ch-pc.w .e { fill: #2a2140; }
+svg.ch-pc.b .e { fill: #cfc5f2; }
+.ch-caps svg.ch-pc { filter: none; stroke-width: 6; }
+
+/* the piece under a finger or the mouse while it's dragged (it lives on <body>, above everything) */
+.ch-ghost { position: fixed; z-index: 120; pointer-events: none; transform: translate(-50%, -50%) scale(1.1); }
+.ch-ghost.touch { transform: translate(-50%, -80%) scale(1.45); }
+.ch-ghost svg { width: 100%; height: 100%; display: block; }
+
+/* promotion: four pieces in a column from the square, over a dimmed board */
+.ch-promo { position: absolute; inset: 0; z-index: 5; background: rgba(10, 7, 22, .5); animation: fadein .15s; }
+.ch-pick { position: absolute; width: 12.5%; height: 12.5%; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle, #fff 0, #ece6fb 60%, #c4b6ef 100%); box-shadow: 0 3px 10px rgba(0, 0, 0, .45); transition: border-radius .15s, transform .1s, background .15s; }
+.ch-pick svg { width: 88%; height: 88%; }
+.ch-pick:hover, .ch-pick:focus-visible { border-radius: 14%; background: var(--accent2); outline: none; }
+.ch-pick:active { transform: scale(.94); }
+
+/* ---------------------------------------------------------------- status, draw and resign */
+.ch-status { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.ch-msg { font: 600 18px var(--display); letter-spacing: .03em; }
+.ch-sub { color: var(--muted); font-size: 13px; margin-top: -4px; }
+.ch-sub:empty { display: none; }
+.ch-offer { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 10px; border-radius: 12px; background: color-mix(in srgb, var(--gold) 16%, var(--panel2)); font-weight: 700; font-size: 14px; }
+.ch-offer > span { flex: 1 1 auto; min-width: 130px; }
+.ch-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ch-btns > span { flex: 1 1 100%; font-weight: 700; font-size: 14px; }
+.ch-btns .btn, .ch-offer .btn { flex: 1 1 0; white-space: nowrap; min-width: 0; }
+
+/* ---------------------------------------------------------------- the moves */
+.ch-movebox { position: relative; flex: 1 1 auto; min-height: 130px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.ch-moves { position: absolute; inset: 0; overflow-y: auto; padding: 6px; font: 700 14px var(--font); user-select: text; -webkit-user-select: text; }
+.ch-mv { display: grid; grid-template-columns: 40px 1fr 1fr; align-items: center; border-radius: 8px; }
+.ch-mv:nth-child(even) { background: color-mix(in srgb, var(--panel2) 70%, transparent); }
+.ch-mv i { font-style: normal; color: var(--faint); font-size: 12px; text-align: right; padding-right: 8px; }
+.ch-mv span { padding: 3px 7px; border-radius: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ch-mv span.now { background: var(--accent); color: #fff; }
+.ch-mv .ch-dots { color: var(--faint); }
+.ch-more { color: var(--faint); font-size: 12px; text-align: center; padding: 6px; }
+
+@media (max-width: 899px) {
+  .ch-movebox { flex: none; height: 136px; }
+}
+@media (max-width: 400px) {
+  .chess { padding: 8px 8px 14px; }
+  .ch-name { font-size: 14px; }
+  .ch-clock { font-size: 17px; min-width: 64px; padding: 6px 7px; }
+  .ch-caps svg { width: 16px; height: 16px; margin-right: -6px; }
+  .ch-msg { font-size: 16px; }
+}

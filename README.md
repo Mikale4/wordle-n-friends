@@ -17,22 +17,51 @@ Before deploying a new version, stamp the files so browsers fetch the new ones:
 python tools/bump.py
 ```
 
-Tests (word engine, scoring, CPU bots, rank maths):
+Tests (word engine, scoring, CPU bots, rank maths; then each of the other games):
 
 ```bash
 node tools/test.js
+node tools/test_runes.js
+node tools/test_wright.js
+node tools/test_chess.js
 ```
 
 ## Screens
 
-**Title → Log in / New player → Hub.** Accounts live in the browser (salted SHA-256 passwords, as in Knock//Back). Each
-account also gets an online identity: two P-256 key pairs made by WebCrypto at sign-up. Your player ID is a hash of the
-signing key, and your **friend code** is `Name#TAG` (the TAG is the first four characters of that ID).
+**Title → Log in / New player → the game picker.** Accounts live in the browser (salted SHA-256 passwords, as in
+Knock//Back). Each account also gets an online identity: two P-256 key pairs made by WebCrypto at sign-up. Your player ID
+is a hash of the signing key, and your **friend code** is `Name#TAG` (the TAG is the first four characters of that ID).
 
-**The hub** has every mode, your rank and level, friends online, and the Friends / Messages buttons (with unread counts)
-that sit in the top bar of every screen. If you step out of an online room, a banner takes you back to it.
+**The game picker** has the four games: **Wordle** big in the middle, **Runecasters** and **Wordwright** either side,
+**Chess** below; plus the online lobby, friends, leaderboard and stats. Wordle opens its hub; each of the others opens
+its own menu: a game against CPU players (1–3 or 5 of them, Easy / Normal / Hard, and the game's settings), or online
+(quick match, host a room, challenge a friend who's online).
 
-## Modes
+**The Wordle hub** has every Wordle mode, your rank and level, friends online, and the Friends / Messages buttons (with
+unread counts) that sit in the top bar of every screen. If you step out of an online room, a banner takes you back to it.
+
+## The other games
+
+They're our own games, in the same genres as some well-known ones, with their own names, rules details and look.
+
+| Game | What it is | Players |
+| --- | --- | --- |
+| Runecasters | A 5×5 grid of letter tiles: trace words through neighbouring tiles (diagonals count) for points, with rune tiles that multiply, and mana to reshuffle, transmute a tile or scry a strong word. Rounds; most points wins. Solo is a score attack. | 1–6 |
+| Wordwright | A crossword tile game on a 15×15 board: build crossing words from a rack of seven tiles, on premium squares of our own layout. | 2–4 |
+| Chess | Chess, with every rule (castling, en passant, promotion, the draw rules), optional clocks, and a CPU that searches in a background worker. | 2 |
+
+Each game is one module (`js/runes.js`, `js/wright.js`, `js/chess.js`) following the contract at the top of
+`js/games.js`: pure rules over plain data (setup, view, move, turn, timers, result, a CPU move) plus a screen.
+`js/match.js` runs any of them against CPU players on your device, or on an online room's host. Runecasters and
+Wordwright check words against a bigger dictionary than Wordle's (`js/dict.js`, ~79,000 words of 2–15 letters from
+SCOWL, built by `tools/build_dict.js`), loaded only when one of them is opened (`js/lexicon.js`).
+
+**Online**, the room's host runs the rules for everyone and sends each player their own view after every move (in
+Wordwright, nobody else's game ever sees your rack or the bag). Rooms show which game they're for; the lobby's NEW ROOM
+form, quick match and challenges all let you pick the game. A player who leaves forfeits a two-player game; in bigger
+games their turns are skipped.
+
+## Wordle modes
 
 | Mode | Rules |
 | --- | --- |
@@ -139,13 +168,18 @@ messages from everyone or friends only; swear filter.
 | `js/rank.js` | rating, tiers, levels, the leaderboard |
 | `js/board.js` | the boards, keyboard and mini progress boards |
 | `js/play.js` | the solo modes |
-| `js/online.js` | the lobby, rooms, quick / ranked match, the online match |
+| `js/online.js` | the lobby, rooms (for any of the four games), quick / ranked match, the online match |
+| `js/games.js` | the contract the other games follow, and their list |
+| `js/match.js` | runs the other games: vs CPU on your device, or on a room's host; their game screen, results, stats and XP |
+| `js/arcade.js` | the game picker, and each of the other games' menus |
+| `js/runes.js`, `js/wright.js`, `js/chess.js` (+ `js/chess-ai.js`) | Runecasters, Wordwright and Chess: rules, CPU players, screens (styles in `css/`) |
+| `js/lexicon.js`, `js/dict.js` | the big dictionary for Runecasters and Wordwright, loaded when first needed |
 | `js/relay.js` | the fallback link for rooms, over the MQTT brokers, when a direct link can't get through |
-| `js/menu.js` | title, login, hub, options, stats, shared UI |
+| `js/menu.js` | title, login, the Wordle hub, options, stats, shared UI |
 | `js/main.js` | screens and keyboard routing |
 | `css/style.css` | all styles (dark and light themes, high-contrast tiles) |
 | `sw.js`, `manifest.webmanifest`, `icons/` | installable app and offline solo play |
-| `tools/` | dev server, version stamp, word-list builder, icon maker, tests, song-to-loop cutter (`loopify.py`), sound-effect trimmer (`sfxprep.py`) |
+| `tools/` | dev server, version stamp, word-list and dictionary builders, icon maker, tests, song-to-loop cutter (`loopify.py`), sound-effect trimmer (`sfxprep.py`) |
 
 ## Word lists
 
@@ -156,4 +190,8 @@ any word up to size 70 is a valid guess. To rebuild:
 ```bash
 npm install --prefix ../wl-tmp wordlist-english
 node tools/build_words.js ../wl-tmp/node_modules/wordlist-english
+node tools/build_dict.js ../wl-tmp/node_modules/wordlist-english
 ```
+
+The second builds `js/dict.js` for Runecasters and Wordwright: every word of 2–15 letters up to SCOWL size 60, without
+letter plurals and slurs.

@@ -1,0 +1,129 @@
+/* ============================================================================
+   wright.css -- the Wordwright screen (js/wright.js). Built on the tokens in
+   style.css. The tiles take after the Wordle tiles: tiles on the board are
+   'miss' grey, the last move is 'hit' green, and your own tiles (on the rack
+   and placed but not played yet) are 'near' amber.
+   Premiums: pink for the word squares, violet for the letter squares; the
+   triple ones solid, the double ones a tint.
+   ========================================================================== */
+.wr { --cs: min(40px, calc((100vw - 30px) / 15)); --gap: 1px; --rs: min(48px, calc((100vw - 64px) / 7));
+  display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 1180px; margin: 0 auto; padding: 8px 4px 20px;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.wr [hidden] { display: none !important; }
+.wr-side { display: flex; flex-direction: column; gap: 6px; padding: 0 2px; min-width: 0; }
+.wr-main { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+
+/* ------------------------------------------------------------------ players, whose turn, the last move */
+.wr-pls { display: grid; grid-template-columns: repeat(var(--np, 2), minmax(0, 1fr)); gap: 6px; }
+.wr-pl { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 6px; min-width: 0; padding: 5px 9px;
+  background: var(--panel); border: 2px solid var(--line); border-radius: 12px; transition: border-color .2s, box-shadow .2s; }
+.wr-pl.on { border-color: var(--accent2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.wr-pn { font: 700 13px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.wr-pl.me .wr-pn { color: var(--accent2); }
+.wr-ps { grid-column: 2; grid-row: 1 / span 2; font: 700 20px/1 var(--display); text-align: right; }
+.wr-pl small { color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.wr-info { display: flex; align-items: center; gap: 8px; min-height: 26px; }
+.wr-turn { font: 600 17px var(--display); letter-spacing: .04em; color: var(--muted); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wr-turn.mine { color: var(--good); }
+.wr-clock { font: 700 17px var(--display); letter-spacing: .05em; min-width: 44px; text-align: right; }
+.wr-clock.low { color: var(--bad); animation: blink 1s infinite; }
+.wr-last { font-size: 13px; color: var(--muted); line-height: 1.7; min-height: 22px; }
+.wr-last b { color: var(--text); }
+.wr-last .wr-pts { font: 700 15px var(--display); color: var(--gold); }
+.wr-w { display: inline-flex; align-items: baseline; gap: 3px; margin: 1px 2px; padding: 2px 7px; border-radius: 7px; background: var(--panel2);
+  color: var(--text); font: 700 12px var(--display); letter-spacing: .1em; white-space: nowrap; }
+.wr-w small { font: 800 10px var(--font); letter-spacing: 0; color: var(--gold); }
+.wr-w.full { background: color-mix(in srgb, var(--gold) 22%, var(--panel2)); }
+
+/* the end: everyone's leftover tiles */
+.wr-end { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+.wr-end h3 { color: var(--gold); }
+.wr-end p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
+.wr-er { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.wr-er > b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wr-mts { display: flex; gap: 2px; flex-wrap: wrap; justify-content: flex-end; }
+.wr-mt { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; background: var(--miss); color: #fff; font: 700 12px var(--display); font-style: normal; }
+.wr-mt.bk { background: color-mix(in srgb, var(--miss) 50%, transparent); }
+.wr-adj { min-width: 40px; text-align: right; font: 700 15px var(--display); color: var(--muted); }
+.wr-adj.up { color: var(--good); } .wr-adj.down { color: var(--bad); }
+
+/* ------------------------------------------------------------------ the board */
+.wr-board { display: grid; grid-template-columns: repeat(15, var(--cs)); grid-auto-rows: var(--cs); gap: var(--gap); padding: 2px;
+  background: var(--line); border-radius: 10px; box-shadow: var(--shadow); touch-action: manipulation; }
+.wc { position: relative; display: grid; place-items: center; overflow: hidden; border-radius: calc(var(--cs) * .18);
+  background: var(--panel2); color: var(--muted); cursor: pointer; }
+.wc > * { pointer-events: none; }
+.wl { font: 800 calc(var(--cs) * .36)/1 var(--font); letter-spacing: -.02em; }
+.wc.p3w { background: var(--hot); color: #fff; }
+.wc.p2w { background: color-mix(in srgb, var(--hot) 32%, var(--panel2)); color: var(--text); }
+.wc.p3l { background: var(--accent); color: #fff; }
+.wc.p2l { background: color-mix(in srgb, var(--accent) 32%, var(--panel2)); color: var(--text); }
+.wc.start { background: color-mix(in srgb, var(--gold) 26%, var(--panel2)); color: var(--gold); }
+.wc.start .wl { font-size: calc(var(--cs) * .62); }
+/* tiles */
+.wc.tl { background: var(--miss); color: #fff; box-shadow: inset 0 calc(var(--cs) * -.09) 0 rgba(0, 0, 0, .2); }
+.wc.tl b { font: 700 calc(var(--cs) * .62)/1 var(--display); }
+.wc.tl i { position: absolute; right: calc(var(--cs) * .07); bottom: calc(var(--cs) * .05); font: 800 max(6px, calc(var(--cs) * .27))/1 var(--font); font-style: normal; opacity: .9; }
+.wc.bk b { opacity: .6; }
+.wc.bk { box-shadow: inset 0 0 0 max(1px, calc(var(--cs) * .07)) rgba(255, 255, 255, .28), inset 0 calc(var(--cs) * -.09) 0 rgba(0, 0, 0, .2); }
+.wc.lst { background: var(--hit); }
+.wc.tn { background: var(--near); cursor: grab; touch-action: none; }
+.wc.lift { opacity: .35; }
+.wc.pop { animation: wrpop .4s cubic-bezier(.2, 1.4, .4, 1); }
+@keyframes wrpop { from { transform: scale(.35); opacity: .3; } }
+/* the typing cursor, a drop target, and squares to aim at while a tile is picked up */
+.wc.cur { box-shadow: inset 0 0 0 2px var(--text); }
+.wc.cur .wl { opacity: .2; }
+.wa { position: absolute; inset: 0; display: grid; place-items: center; font-size: calc(var(--cs) * .5); color: var(--text); }
+.wc.hov { box-shadow: inset 0 0 0 3px var(--gold); }
+.wr.sel .wc:not(.tl):hover { box-shadow: inset 0 0 0 2px var(--near); }
+
+/* ------------------------------------------------------------------ the play so far, the rack, the buttons */
+.wr-prev { min-height: 26px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 4px; padding: 0 4px;
+  font-size: 13px; line-height: 1.35; text-align: center; max-width: 100%; }
+.wr-prev.bad { color: var(--bad); font-weight: 700; }
+.wr-prev.shake { animation: shake .4s; }
+.wr-prev > b { margin-left: 4px; font: 700 17px var(--display); color: var(--gold); }
+
+.wr-rack { display: flex; gap: 6px; justify-content: center; min-height: var(--rs); touch-action: none; }
+.rt { position: relative; flex: none; width: var(--rs); height: var(--rs); display: grid; place-items: center; padding: 0; border: 0;
+  border-radius: calc(var(--rs) * .2); background: var(--near); color: #fff; font: 700 calc(var(--rs) * .56)/1 var(--display);
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .2); cursor: grab; touch-action: none; transition: transform .12s, box-shadow .12s, opacity .12s; }
+.rt i { position: absolute; right: calc(var(--rs) * .1); bottom: calc(var(--rs) * .07); font: 800 calc(var(--rs) * .25)/1 var(--font); font-style: normal; pointer-events: none; }
+.rt.bk { color: rgba(255, 255, 255, .6); box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .3), inset 0 -4px 0 rgba(0, 0, 0, .2); }
+.rt.on { transform: translateY(-6px); box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .2), 0 0 0 3px var(--text); }
+.rt.lift { opacity: .3; }
+.rt.empty { background: transparent; box-shadow: inset 0 0 0 2px var(--line); cursor: default; }
+.wr-ghost { --rs: 48px; position: fixed; z-index: 95; left: 0; top: 0; transform: translate(-50%, -65%) scale(1.1); pointer-events: none;
+  box-shadow: var(--shadow), inset 0 -4px 0 rgba(0, 0, 0, .2); cursor: grabbing; }
+
+.wr-btns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; width: min(100%, 560px); }
+.wr-btns .btn { min-width: 0; padding-left: 4px; padding-right: 4px; white-space: nowrap; }
+.wr-btns .btn small:empty { display: none; }
+.wr-btns .wr-play { grid-column: 1 / -1; order: 2; font-size: 17px; padding-top: 9px; padding-bottom: 9px; }
+
+/* pop-ups: the exchange picker and the blank's letter */
+.wr-modal { --rs: min(42px, calc((100vw - 110px) / 7)); }
+.wr-xr { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 12px 0 6px; }
+.wr-xr .rt { cursor: pointer; }
+.wr-xr .rt.on { box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .2), 0 0 0 3px var(--bad); }
+.wr-abc { display: grid; grid-template-columns: repeat(7, var(--rs)); gap: 6px; justify-content: center; margin: 10px 0 6px; }
+.wr-abc .rt { cursor: pointer; font-size: calc(var(--rs) * .5); }
+.wr-abc .rt:hover { filter: brightness(1.1); }
+
+/* ------------------------------------------------------------------ wider screens */
+@media (min-width: 600px) {
+  .wr { --cs: max(22px, min(40px, calc((100vw - 60px) / 15), calc((100dvh - 400px) / 15))); --gap: 2px; padding: 12px 12px 24px; }
+  .wr-btns { grid-template-columns: 1.5fr repeat(4, minmax(0, 1fr)); }
+  .wr-btns .wr-play { grid-column: auto; order: 0; }
+}
+@media (min-width: 900px) {
+  .wr { display: grid; grid-template-columns: minmax(0, 1fr) 290px; align-items: start; gap: 18px; padding: 14px 16px 24px;
+    --cs: max(24px, min(42px, calc((100vw - 400px) / 15), calc((100dvh - 280px) / 15))); --rs: 50px; }
+  .wr-side { order: 2; position: sticky; top: 76px; }
+  .wr-main { order: 1; }
+  .wr-pls { grid-template-columns: 1fr; }
+  .wr-pl { padding: 8px 12px; }
+  .wr-pn { font-size: 15px; }
+  .wr-ps { font-size: 24px; }
+}

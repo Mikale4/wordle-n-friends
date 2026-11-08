@@ -39,7 +39,7 @@
 (function () {
   'use strict';
   const { el } = U;
-  const PROTO = 'wnf-room-1';
+  const PROTO = 'wnf-room-2';                  // 2: rooms for any game (games.js), not only Wordle
   const PEER_JS = ['https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'];
   const PREFIX = 'wordle-n-friends-room-', ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const ROOM_MAX = 8, START_IN = 3500, GAP_MS = 7000, AUTO_CD = 5;
@@ -113,16 +113,23 @@
   const act = msg => toHost(msg);
 
   /* ===================================================== the host's side */
+  /* a room plays one game: 'wordle' (the rounds below) or one of games.js (match.js runs it) */
+  const gameOf = id => (id && id !== 'wordle' && window.Games && Games.get(id)) || null;
+  const gameName = id => { const g = gameOf(id); return g ? g.name : 'Wordle'; };
+  const gameRulesTxt = (g, r) => (g.options || []).map(op => { const v = op.values.find(x => String(x[0]) === String(r[op.key])); return op.label.toLowerCase() + ' ' + (v ? v[1] : '?'); }).join(' · ');
   function newRoom(o, code, id) {
+    const g = o.ranked ? null : gameOf(o.game);
     return { code, hostId: id, name: U.clean(o.name, 24) || Auth.name + '\'s room', priv: !!o.priv, listed: o.listed !== false, locked: false, max: o.ranked ? 2 : U.clamp(o.max | 0 || ROOM_MAX, 2, ROOM_MAX),
-      chat: 'on', muted: [], ranked: !!o.ranked, rules: Object.assign({}, o.ranked ? RANKED_RULES : DEFAULT_RULES, o.ranked ? {} : o.rules || {}), auto: o.auto !== false,
+      game: g ? g.id : 'wordle',
+      chat: 'on', muted: [], ranked: !!o.ranked, rules: g ? Games.opts(g, o.rules) : Object.assign({}, o.ranked ? RANKED_RULES : DEFAULT_RULES, o.ranked ? {} : o.rules || {}), auto: o.auto !== false,
       members: [], match: null, last: null, cd: null, chal: o.chal ? { to: o.chal.to, name: o.chal.name } : null };
   }
   function listing() {
     const R = N && N.room; if (!R || !R.listed) return null;
     const host = memberOf(R.hostId) || {};
-    return { name: R.name, host: host.name || Auth.name, hostId: Auth.id, n: R.members.length, max: R.max, priv: R.priv, ranked: R.ranked, rating: host.r || 1000,
-      state: R.locked ? 'locked' : R.members.length >= R.max ? 'full' : R.match ? 'playing' : 'open', mode: R.rules.mode, len: R.rules.len, rounds: R.rules.rounds };
+    return { name: R.name, host: host.name || Auth.name, hostId: Auth.id, n: R.members.length, max: R.max, priv: R.priv, ranked: R.ranked, rating: host.r || 1000, game: R.game,
+      state: R.locked ? 'locked' : R.members.length >= R.max ? 'full' : R.match ? 'playing' : 'open', mode: R.rules.mode, len: R.rules.len, rounds: R.rules.rounds,
+      rtxt: gameOf(R.game) ? gameRulesTxt(gameOf(R.game), R.rules) : null };
   }
   let pushT = null;
   function pushRoom() {
@@ -157,6 +164,7 @@
       sysSay(m.name + ' joined.');
       if (wasChal) { R.chal = null; N.chal = null; }
       if (R.match && H) { conn.send(roundMsg(id)); conn.send({ t: 'progall', mid: R.match.mid, r: R.match.round, p: progAll() }); }
+      if (R.match && GM) conn.send(gameMsg(id));                             // (they watch the game under way)
       pushRoom(); return;
     }
     if (!N.mem.has(id)) return;
@@ -176,6 +184,7 @@
       }
       case 'chat': if (QUICK[d.i | 0] != null) toAll({ t: 'chat', c: { id, uid: m.uid, name: m.name, i: d.i | 0 } }); break;
       case 'g': hostGuess(id, d); break;
+      case 'gm': if (GM && d.mid === GM.mid && GM.ids.includes(id)) { const r = GM.R.apply(id, d.m); if (r.err) toMember(id, { t: 'gerr', mid: GM.mid, err: r.err }); } break;
     }
   }
   function memberGone(id, how) {
@@ -184,7 +193,8 @@
     const R = N.room, m = memberOf(id); if (!m) return;
     R.members = R.members.filter(x => x.id !== id);
     sysSay(m.name + (how === 'kicked' ? ' was removed.' : ' left.'));
-    if (R.match) {
+    if (R.match && GM) { if (GM.ids.includes(id)) GM.R.leave(id); }      // (their turns pass; a two-player game ends)
+    else if (R.match) {
       R.match.ids = R.match.ids.filter(x => x !== id);
       if (H && H.players.has(id)) { H.players.get(id).gone = true; H.players.get(id).name = m.name; }
       if (R.match.ids.length < 2 && R.match.state !== 'over') endMatch(true);
@@ -204,7 +214,12 @@
       if (k === 'listed' && !R.listed) Dir.update();
       pushRoom();
     },
-    rule(k, v) { const R = N.room; if (R.ranked || R.match) return; R.rules[k] = v; if (k === 'mode' && v === 'quad') R.rules.len = 5; pushRoom(); },
+    rule(k, v) {
+      const R = N.room; if (R.ranked || R.match) return;
+      const g = gameOf(R.game);
+      if (g) { const op = (g.options || []).find(x => x.key === k), hit = op && op.values.find(x => String(x[0]) === String(v)); if (!hit) return; R.rules[k] = hit[0]; pushRoom(); return; }
+      R.rules[k] = v; if (k === 'mode' && v === 'quad') R.rules.len = 5; pushRoom();
+    },
     kick(id, block) { const m = memberOf(id); if (!m || m.host || (N.room.ranked && N.room.match)) return; if (block) N.blocked.add(m.uid); toMember(id, { t: 'kicked', block }); setTimeout(() => { const M = N && N.mem.get(id); try { M && M.conn.close(); } catch (e) { /* fine */ } memberGone(id, 'kicked'); }, 300); },
     mute(id) { const m = memberOf(id), R = N.room; if (!m) return; const i = R.muted.indexOf(m.uid); if (i >= 0) R.muted.splice(i, 1); else R.muted.push(m.uid); pushRoom(); },
     start() { if (eligible().length >= 2 && eligible().every(m => m.ready)) startMatch(); else toast('Everyone playing needs to be READY (two at least).', 'bad'); },
@@ -228,6 +243,7 @@
   const boardsFor = rules => rules.mode === 'quad' ? 4 : 1;
   const maxFor = rules => rules.mode === 'quad' ? 9 : Engine.maxFor(rules.len);
   function startMatch() {
+    if (gameOf(N.room.game)) return startGame();
     const R = N.room, ids = eligible().filter(m => m.ready).map(m => m.id);
     if (ids.length < 2) return;
     R.match = { mid: U.rid(8), round: 0, rounds: R.rules.rounds, ids, scores: {}, names: {}, uids: {}, rs: {}, state: 'count', words: [] };
@@ -306,6 +322,43 @@
     }, GAP_MS);
     pushRoom();
   }
+  /* ---- the other games, on the host: match.js runs the rules; each member gets their own view after every change
+     (a player's view can hold secrets, like their Wordwright rack; people watching get the public one) */
+  let GM = null;   // { mid, g, R: the Runner, ids }
+  async function startGame() {
+    const R = N.room, g = gameOf(R.game); if (!g || R.match || N.starting) return;
+    const ids = eligible().filter(m => m.ready).map(m => m.id).slice(0, g.players[1]);
+    if (ids.length < Math.max(2, g.players[0])) return;
+    if (g.lex && !Lex.ready) {
+      N.starting = true; sysSay('Getting the dictionary ready...');
+      try { await Lex.load(); } catch (e) { toast(e.message, 'bad'); } finally { if (N) N.starting = false; }
+      if (!N || !N.host || N.room !== R || R.match || !Lex.ready) return;
+    }
+    const players = ids.map(id => ({ id, name: memberOf(id).name }));
+    const M = R.match = { mid: U.rid(8), game: g.id, round: 1, rounds: 1, ids, scores: {}, names: {}, uids: {}, rs: {}, state: 'play' };
+    for (const id of ids) { const m = memberOf(id); M.names[id] = m.name; M.uids[id] = m.uid; M.rs[id] = m.r; }
+    R.cd = null;
+    sysSay(g.name + ' starting: ' + players.map(p => p.name).join(', ') + '.');
+    let run = null;
+    try { run = Match.Runner(g, Games.opts(g, R.rules), players, { think: 0, push: () => pushGame(), over: res => endGame(res) }); }
+    catch (e) { console.error(e); R.match = null; toast('The game couldn\'t start: ' + e.message, 'bad'); pushRoom(); return; }
+    GM = { mid: M.mid, g, R: run, ids };
+    pushGame(); pushRoom();
+  }
+  function gameMsg(forId) {
+    const M = N.room.match;
+    return { t: 'gv', mid: GM.mid, game: GM.g.id, ids: GM.ids, names: M ? M.names : {}, uids: M ? M.uids : {}, v: GM.R.view(GM.ids.includes(forId) ? forId : null) };
+  }
+  function pushGame() { if (!GM || !N || !N.host) return; for (const m of N.room.members) toMember(m.id, gameMsg(m.id)); }
+  function endGame(res) {
+    const R = N && N.room, M = R && R.match; if (!M || !GM) return;
+    const order = (res.ranks || []).flat();
+    toAll({ t: 'gend', mid: GM.mid, res, gone: [...GM.R.gone] });
+    R.last = { names: order.map(id => M.names[id] || '?'), pts: order.map(id => res.scores && typeof res.scores[id] === 'number' && GM.g.id !== 'chess' ? res.scores[id] : (res.ranks[0].includes(id) ? (res.ranks[0].length > 1 ? 'draw' : 'won') : '')) };
+    GM.R.stop(); GM = null; R.match = null;
+    for (const m of R.members) m.ready = false;
+    pushRoom();
+  }
   function endMatch(forfeit) {
     const R = N.room, M = R.match; if (!M) return;
     M.state = 'over';
@@ -338,6 +391,9 @@
       case 'progall': if (G && G.mid === d.mid && G.r === d.r) for (const id in d.p) onProg(d.mid, d.r, id, d.p[id]); break;
       case 'rend': onRend(d); break;
       case 'mend': onMend(d); break;
+      case 'gv': onGameView(d); break;
+      case 'gerr': if (GV && GV.mid === d.mid) { toast(String(d.err || 'Not allowed.').slice(0, 120), 'bad'); SFX.play('bad'); } break;
+      case 'gend': onGameEnd(d); break;
     }
   }
   function roomGone(text) {
@@ -355,7 +411,8 @@
     if (!R) { if (N.view === 'lobby') Net.setStatus('lobby', 'In the online lobby'); return; }
     const pub = R.listed && !R.priv && !R.ranked ? R.code : null;
     if (G && G.play && !G.over) Net.setStatus('play', R.ranked ? 'Playing a ranked match' : 'Playing ' + MODE_TXT[R.rules.mode] + ' online', pub);
-    else Net.setStatus('room', R.ranked ? 'Waiting for a ranked match' : 'In room "' + R.name + '"', pub);
+    else if (GV && !GV.over && GV.ids.includes(N.myId)) Net.setStatus('play', 'Playing ' + GV.g.name + ' online', pub);
+    else Net.setStatus('room', R.ranked ? 'Waiting for a ranked match' : 'In room "' + R.name + '"' + (gameOf(R.game) ? ' (' + gameName(R.game) + ')' : ''), pub);
   }
 
   /* ===================================================== joining, hosting, leaving */
@@ -445,7 +502,8 @@
       const opp = Object.keys(G.names).find(id => id !== S.myId); if (opp) { const r = Rank.apply((G.rs && G.rs[opp]) || 1000, 0, G.names[opp]); toast('Left a ranked match: counted as a loss (' + r.d + ').', 'bad'); }
     }
     if (S.chal && S.room && S.room.chal) Net.send(S.chal.to, 'chalx', { code: S.code });
-    if (S.host) { toAll({ t: 'closed' }); Dir.stopHost(); clearInterval(S.tickT); H = null; }
+    if (S.host) { toAll({ t: 'closed' }); Dir.stopHost(); clearInterval(S.tickT); H = null; if (GM) { GM.R.stop(); GM = null; } }
+    GV = null;
     const peer = S.peer; clearTimeout(S.relayT);
     setTimeout(() => {
       for (const c of new Set([S.conn, ...(S.tries || [])])) { try { if (c) { c.dropped = true; c.close(); } } catch (e) { /* fine */ } }
@@ -471,9 +529,9 @@
     }
     return Net.state === 'up';
   }
-  async function findMatch(ranked) {
+  async function findMatch(ranked, game) {
     if (N && N.room) Online.leave(true);
-    N = freshN(); N.stage = 'quick'; N.quick = { ranked, tried: new Set() };
+    N = freshN(); N.stage = 'quick'; N.quick = { ranked, game: gameOf(game) ? game : 'wordle', tried: new Set() };
     const S0 = N; show();
     const ok = await waitForList();
     if (N !== S0) return;
@@ -482,15 +540,27 @@
   }
   Online.quick = () => findMatch(false);
   Online.ranked = () => findMatch(true);
+  Online.quickGame = id => findMatch(false, id);
+  /* the lobby's NEW ROOM form, set to a game */
+  Online.hostGame = id => {
+    if (!Auth.user) return Menu.login();
+    if (N && N.room) { Online.back(); toast('You\'re in a room already: leave it first to host a new one.', 'bad'); return; }
+    if (Net.state === 'off') Net.start();
+    N = N || freshN(); N.stage = 'create'; N.status = ''; N.form = null; N.formGame = gameOf(id) ? id : 'wordle'; show();
+  };
   function quickNext() {
     const Q = N.quick; if (!Q) return;
-    const myR = Auth.S.rank.rating;
-    const rooms = listedRooms().filter(r => !r.priv && r.n < r.max && !Q.tried.has(r.code) && r.hostId !== Auth.id && !Auth.S.blocked[r.hostId] && (Q.ranked ? r.ranked && r.state === 'open' : !r.ranked && (r.state === 'open' || r.state === 'playing')))
+    const myR = Auth.S.rank.rating, QG = gameOf(Q.game);
+    const rooms = listedRooms().filter(r => !r.priv && r.n < r.max && !Q.tried.has(r.code) && r.hostId !== Auth.id && !Auth.S.blocked[r.hostId] && (r.game || 'wordle') === Q.game
+      && (Q.ranked ? r.ranked && r.state === 'open' : !r.ranked && (r.state === 'open' || (!QG && r.state === 'playing'))))
       .sort(Q.ranked ? (a, b) => Math.abs(a.rating - myR) - Math.abs(b.rating - myR) : (a, b) => (a.state === 'open' ? 0 : 1) - (b.state === 'open' ? 0 : 1) || b.n - a.n);
     if (!rooms.length) {
       N.quick = null;
-      Online.create(Q.ranked ? { name: Auth.name + '\'s ranked match', ranked: true, listed: true, auto: true } : { name: (Auth.name + '\'s room').slice(0, 24), listed: true, max: ROOM_MAX, auto: true, ready: true, quick: true });
-      toast(Q.ranked ? 'No one waiting: opened a ranked match. Hang on for an opponent.' : 'No open rooms: opened one. Waiting for players.');
+      const gp = QG && Auth.prefs.arc && Auth.prefs.arc[QG.id];
+      Online.create(Q.ranked ? { name: Auth.name + '\'s ranked match', ranked: true, listed: true, auto: true }
+        : QG ? { name: (Auth.name + '\'s ' + QG.name).slice(0, 24), game: QG.id, rules: gp && gp.opts, listed: true, max: Math.min(QG.players[1], 4), auto: true, ready: true, quick: true }
+          : { name: (Auth.name + '\'s room').slice(0, 24), listed: true, max: ROOM_MAX, auto: true, ready: true, quick: true });
+      toast(Q.ranked ? 'No one waiting: opened a ranked match. Hang on for an opponent.' : 'No open ' + (QG ? QG.name + ' ' : '') + 'rooms: opened one. Waiting for players.');
       return;
     }
     Q.tried.add(rooms[0].code); Online.join(rooms[0].code, '', { quick: true });
@@ -507,12 +577,15 @@
     const name = Net.nameOf(id);
     if (N && N.room) Online.leave(true);
     N = freshN();
-    const rules = o.ranked ? RANKED_RULES : { mode: o.mode || 'race', len: o.mode === 'quad' ? 5 : o.len || 5, rounds: o.rounds || 3, time: 120, hard: false };
-    Online.create({ name: (Auth.name + ' vs ' + name).slice(0, 24), priv: true, pass: U.rid(6), listed: false, max: 2, ranked: !!o.ranked, rules, auto: true, chal: { to: id, name } });
+    const g = !o.ranked && gameOf(o.game);
+    const rules = g ? Games.opts(g, o.opts) : o.ranked ? RANKED_RULES : { mode: o.mode || 'race', len: o.mode === 'quad' ? 5 : o.len || 5, rounds: o.rounds || 3, time: 120, hard: false };
+    Online.create({ name: (Auth.name + ' vs ' + name).slice(0, 24), priv: true, pass: U.rid(6), listed: false, max: 2, ranked: !!o.ranked, game: g ? g.id : 'wordle', rules, auto: true, chal: { to: id, name } });
   };
   async function sendChallenge(ch) {
     const R = N.room; N.chal = ch;
-    const desc = MODE_TXT[R.rules.mode] + ' · ' + R.rules.len + ' letters · ' + R.rules.rounds + ' round' + (R.rules.rounds > 1 ? 's' : '');
+    const RG = gameOf(R.game);
+    const desc = RG ? RG.name + (gameRulesTxt(RG, R.rules) ? ' · ' + gameRulesTxt(RG, R.rules) : '')
+      : 'Wordle · ' + MODE_TXT[R.rules.mode] + ' · ' + R.rules.len + ' letters · ' + R.rules.rounds + ' round' + (R.rules.rounds > 1 ? 's' : '');
     const r = await Net.send(ch.to, 'chal', { code: R.code, pass: N.pass, ranked: R.ranked, desc }, true);
     if (r.err) { toast('Couldn\'t send the challenge: ' + r.err, 'bad'); Online.leave(); return; }
     toast('Challenge sent to ' + ch.name + '.');
@@ -527,6 +600,52 @@
     const R = N.room;
     Net.send(id, 'inv', { code: R.code, pass: N.host ? N.pass : N.passUsed, name: R.name }, true).then(r => toast(r.err ? 'Couldn\'t invite: ' + r.err : 'Invite sent to ' + Net.nameOf(id) + '.', r.err ? 'bad' : 'gold'));
   };
+
+  /* ===================================================== another game (games.js) on your screen */
+  let GV = null;   // { mid, g, ids, names, uids, view, ui, scr, over }
+  function onGameView(d) {
+    const g = gameOf(d.game); if (!g || !N || !N.room || !d.v) return;
+    if (!GV || GV.mid !== d.mid) {
+      GV = { mid: d.mid, g, ids: (d.ids || []).map(String), names: d.names || {}, uids: d.uids || {}, view: null, ui: null, scr: null, over: false };
+      if (g.lex) Lex.load().catch(() => {});                              // (the board's live word checks)
+      GV.view = d.v; setPresence();
+      if (GV.ids.includes(N.myId) || N.autoWatch) { gameView(); return; }
+      if (N.view === 'room') draw();
+      return;
+    }
+    GV.view = d.v;
+    if (GV.ui && GV.scr && document.body.contains(GV.scr)) GV.ui.update(d.v);
+  }
+  function gameView() {
+    if (!GV || !N || !N.room) return;
+    const me = GV.ids.includes(N.myId) ? N.myId : null;
+    const api = {
+      me, online: true, players: GV.ids.map(id => ({ id, name: GV.names[id] || '?', cpu: null })),
+      act: m => { if (!GV || GV.over) return; act({ t: 'gm', mid: GV.mid, m }); },
+      toast: (t, k) => toast(t, k), sfx: n => SFX.play(n),
+    };
+    const chatB = el('button', { class: 'btn ghost small', onclick: () => gameChat() }, el('span', null, 'CHAT'));
+    const s = Match.screen(GV.g, { online: true, api, title: GV.g.name.toUpperCase() + (me ? '' : ' · WATCHING'), extra: [chatB], onBack: () => { N.view = 'room'; show(); } });
+    GV.ui = s.ui; GV.scr = s.scr; N.view = 'game';
+    App.onLeave(() => { if (N) N.view = null; if (GV) GV.ui = null; });
+    if (GV.view) GV.ui.update(GV.view);
+  }
+  function gameChat() {
+    if (!N || !N.room) return;
+    N.chatEl = el('div', { class: 'chatlog' });
+    Menu.modal({ title: 'ROOM CHAT', cls: 'gchatpop', body: [N.chatEl, chatInput(), el('div', { class: 'quickchat' }, ...QUICK.map((t, i) => el('button', { onclick: () => act({ t: 'chat', i }) }, t)))], onClose: () => { if (N) N.chatEl = null; } });
+    drawChat();
+  }
+  function onGameEnd(d) {
+    if (!GV || GV.mid !== d.mid || GV.over) return;
+    GV.over = true; setPresence();
+    const res = d.res || {}, players = GV.ids.map(id => ({ id, name: GV.names[id] || '?' })), me = GV.ids.includes(N.myId) ? N.myId : null;
+    const xp = me ? Match.record(GV.g, res, players, true, me) : 0;
+    const onScreen = GV.scr && document.body.contains(GV.scr);
+    if (!onScreen) { if (me) { const o = Match.outcome(res, me, players.length); toast(o === 'win' ? 'You won the ' + GV.g.name + ' game!' : o === 'draw' ? 'Your ' + GV.g.name + ' game was a draw.' : 'Your ' + GV.g.name + ' game is over.'); } if (N.view === 'room') draw(); return; }
+    const back = () => { if (N && N.room) { N.view = 'room'; show(); } };
+    setTimeout(() => { if (GV && GV.scr && document.body.contains(GV.scr)) Match.results(GV.g, res, players, me, { xp, gone: new Set(d.gone || []), back, backLabel: 'BACK TO THE ROOM' }); }, 1000);
+  }
 
   /* ===================================================== a round on your screen */
   function onRound(d) {
@@ -761,22 +880,31 @@
         el('p', null, N.stage === 'quick' ? (N.quick && N.quick.ranked ? 'RANKED: finding an opponent near ' + Auth.S.rank.rating + '...' : 'QUICK MATCH: looking for an open room...') : N.stage === 'creating' ? 'Opening your room...' : 'Joining room ' + N.code + '...'),
         btn('CANCEL', () => { Online.leave(true); N = freshN(); show(); }, 'ghost'))];
     } else if (N.stage === 'create') {
-      const f = N.form = N.form || { name: Auth.name + '\'s room', priv: false, pass: '', listed: true, max: ROOM_MAX, rules: Object.assign({}, DEFAULT_RULES) };
+      const sizeFor = id => { const g = gameOf(id); return g ? Math.min(g.players[1], 6) : ROOM_MAX; };
+      const fg = N.formGame || 'wordle';
+      const f = N.form = N.form || { name: Auth.name + '\'s ' + (gameOf(fg) ? gameName(fg) : 'room'), game: fg, priv: false, pass: '', listed: true, max: sizeFor(fg), rules: Object.assign({}, DEFAULT_RULES), grules: {} };
+      const FG = gameOf(f.game), gr = FG ? (f.grules[FG.id] = Games.opts(FG, f.grules[FG.id] || (Auth.prefs.arc && Auth.prefs.arc[FG.id] && Auth.prefs.arc[FG.id].opts))) : null;
       const name = el('input', { type: 'text', maxlength: 24, class: 'input', value: f.name, oninput: e => { f.name = e.target.value; } });
       const pass = el('input', { type: 'text', maxlength: 16, class: 'input', value: f.pass, placeholder: 'password', autocomplete: 'off', oninput: e => { f.pass = e.target.value; } });
-      const go = () => { if (f.priv && !f.pass.trim()) { N.status = 'A private room needs a password.'; show(); return; } Online.create({ name: f.name, priv: f.priv, pass: f.pass.trim(), listed: f.listed, max: f.max, rules: f.rules, auto: true }); };
+      const go = () => { if (f.priv && !f.pass.trim()) { N.status = 'A private room needs a password.'; show(); return; } Online.create({ name: f.name, game: f.game, priv: f.priv, pass: f.pass.trim(), listed: f.listed, max: f.max, rules: FG ? gr : f.rules, auto: true }); };
       const r = f.rules;
+      const games = [['wordle', 'Wordle'], ...Games.list.map(g => [g.id, g.name])];
       play = [el('h3', null, 'NEW ROOM'),
+        seg('GAME', f.game, games, v => { const was = gameName(f.game); f.game = v; N.formGame = v; f.max = sizeFor(v); if (f.name === Auth.name + '\'s ' + (was === 'Wordle' ? 'room' : was)) f.name = Auth.name + '\'s ' + (gameOf(v) ? gameName(v) : 'room'); show(); }),
         el('label', { class: 'field keepfocus' }, el('span', null, 'ROOM NAME'), name),
         seg('TYPE', f.priv, [[false, 'Public'], [true, 'Private (password)']], v => { f.priv = v === true || v === 'true'; show(); }),
         f.priv ? el('label', { class: 'field keepfocus' }, el('span', null, 'PASSWORD'), pass) : null,
         seg('ROOM LIST', f.listed, [[true, 'Listed'], [false, 'Code only']], v => { f.listed = v === true || v === 'true'; show(); }),
-        seg('PLAYERS', f.max, [2, 3, 4, 5, 6, 7, 8].map(n => [n, String(n)]), v => { f.max = +v; show(); }),
-        seg('MODE', r.mode, [['race', 'Race'], ['blitz', 'Blitz'], ['quad', 'Quad']], v => { r.mode = v; if (v === 'quad') r.len = 5; show(); }),
-        r.mode === 'quad' ? null : seg('LETTERS', r.len, Engine.LENS.map(n => [n, String(n)]), v => { r.len = +v; show(); }),
-        seg('ROUNDS', r.rounds, [[1, '1'], [3, '3'], [5, '5'], [10, '10']], v => { r.rounds = +v; show(); }),
-        seg(r.mode === 'blitz' ? 'ROUND LENGTH' : 'TIME LIMIT', r.time, (r.mode === 'blitz' ? [[60, '60 s'], [120, '2 min'], [180, '3 min']] : [[60, '60 s'], [120, '2 min'], [180, '3 min'], [0, 'None']]), v => { r.time = +v; show(); }),
-        seg('HARD MODE', r.hard, [[false, 'Off'], [true, 'On']], v => { r.hard = v === true || v === 'true'; show(); }),
+        seg('ROOM SIZE', f.max, [2, 3, 4, 5, 6, 7, 8].map(n => [n, String(n)]), v => { f.max = +v; show(); }),
+        ...(FG ? [
+          ...(FG.options || []).map(op => seg(op.label, gr[op.key], op.values, v => { gr[op.key] = op.values.find(x => String(x[0]) === String(v))[0]; show(); })),
+          el('p', { class: 'small muted' }, FG.blurb + '. ' + (FG.players[1] === 2 ? 'Two play; anyone else in the room watches.' : 'Up to ' + FG.players[1] + ' play; anyone else watches.')),
+        ] : [
+          seg('MODE', r.mode, [['race', 'Race'], ['blitz', 'Blitz'], ['quad', 'Quad']], v => { r.mode = v; if (v === 'quad') r.len = 5; show(); }),
+          r.mode === 'quad' ? null : seg('LETTERS', r.len, Engine.LENS.map(n => [n, String(n)]), v => { r.len = +v; show(); }),
+          seg('ROUNDS', r.rounds, [[1, '1'], [3, '3'], [5, '5'], [10, '10']], v => { r.rounds = +v; show(); }),
+          seg(r.mode === 'blitz' ? 'ROUND LENGTH' : 'TIME LIMIT', r.time, (r.mode === 'blitz' ? [[60, '60 s'], [120, '2 min'], [180, '3 min']] : [[60, '60 s'], [120, '2 min'], [180, '3 min'], [0, 'None']]), v => { r.time = +v; show(); }),
+          seg('HARD MODE', r.hard, [[false, 'Off'], [true, 'On']], v => { r.hard = v === true || v === 'true'; show(); })]),
         el('div', { class: 'row' }, btn('CREATE ROOM', go, 'big'), btn('BACK', () => { N.stage = 'lobby'; N.status = ''; show(); }, 'ghost'))];
     } else {
       const code = el('input', { type: 'text', maxlength: 5, placeholder: 'CODE', class: 'input code', autocomplete: 'off', value: N.codeIn || '', oninput: e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); N.codeIn = e.target.value; } });
@@ -800,7 +928,7 @@
     const pfilter = el('input', { type: 'text', class: 'input small', placeholder: 'Find a player', value: N.pq || '', oninput: e => { N.pq = e.target.value; fillPlayers(); } });
     const plist = el('div', { class: 'plist' }), pcount = el('small', null, '');
     const tabs = el('div', { class: 'tabs lobbytabs' }, ...[['play', 'PLAY'], ['chat', 'CHAT'], ['players', 'PLAYERS']].map(([k, t]) => el('button', { class: N.tab === k ? 'on' : '', onclick: () => { N.tab = k; show(); } }, t)));
-    const scr = el('div', { class: 'screen online lobby tab-' + N.tab }, topbar('ONLINE LOBBY', () => { Online.away(); Menu.hub(); }),
+    const scr = el('div', { class: 'screen online lobby tab-' + N.tab }, topbar('ONLINE LOBBY', () => { Online.away(); Menu.home(); }),
       tabs,
       el('div', { class: 'lobbygrid' },
         el('section', { class: 'panel lcol lplay' }, ...play, N.status ? el('p', { class: 'olstatus' }, N.status) : null),
@@ -822,7 +950,8 @@
         const go = () => { if (r.priv && !open) { N.passFor = r.code; fillRooms(); const i = N.listEl.querySelector('.rpass'); if (i) i.focus(); return; } Online.join(r.code, pass ? pass.value : ''); };
         if (pass) pass.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
         N.listEl.append(el('div', { class: 'olroom' + (cant ? ' off' : '') + (r.ranked ? ' ranked' : '') },
-          el('div', { class: 'olroomt' }, el('b', null, r.name), el('small', null, 'Host ' + r.host + ' · ' + (r.ranked ? 'RANKED 1v1 · ' + r.rating : MODE_TXT[r.mode] + ' · ' + r.len + ' letters · ' + r.rounds + ' rds'))),
+          el('div', { class: 'olroomt' }, el('b', null, r.name), el('small', null, 'Host ' + r.host + ' · ' + (r.ranked ? 'RANKED 1v1 · ' + r.rating : gameOf(r.game) ? gameName(r.game) + (r.rtxt ? ' · ' + String(r.rtxt).slice(0, 60) : '') : MODE_TXT[r.mode] + ' · ' + r.len + ' letters · ' + r.rounds + ' rds'))),
+          el('em', { class: 'pill game g-' + (gameOf(r.game) ? r.game : 'wordle') }, gameName(r.game).toUpperCase()),
           r.priv ? el('em', { class: 'pill' }, 'PRIVATE') : null,
           el('span', { class: 'olroomn' }, r.n + '/' + r.max),
           el('em', { class: 'pill st-' + r.state }, r.state.toUpperCase()),
@@ -870,6 +999,8 @@
     const M = R.match, inMatch = M && M.ids.includes(N.myId);
     let now;
     if (R.chal) now = [el('b', null, 'CHALLENGE SENT'), el('small', null, 'Waiting for ' + R.chal.name + ' to accept...')];
+    else if (M && gameOf(R.game)) now = [el('b', null, gameName(R.game).toUpperCase() + ' · GAME ON'), el('small', null, M.ids.map(id => (memberOf(id) || {}).name || M.names[id] || '?').join(' · ')),
+      GV && GV.mid === M.mid ? btn(inMatch ? 'BACK TO THE GAME' : 'WATCH', () => gameView(), 'big' + (inMatch ? ' hot' : '')) : el('small', null, 'You\'ll be in the next one.')];
     else if (M) now = [el('b', null, (M.state === 'over' ? 'MATCH OVER' : 'MATCH ON · ROUND ' + M.round + ' / ' + M.rounds)), el('small', null, M.ids.map(id => (memberOf(id) || {}).name || '?').join(' · ')),
       G && G.mid === M.mid ? btn(inMatch ? 'BACK TO THE GAME' : 'WATCH', () => gameScreen(), 'big' + (inMatch ? ' hot' : '')) : el('small', null, 'You\'ll be in the next one.')];
     else {
@@ -897,11 +1028,16 @@
     const hostPass = el('input', { type: 'text', maxlength: 16, class: 'input', value: host ? N.pass || '' : '', placeholder: 'password', autocomplete: 'off' });
     N.chatEl = el('div', { class: 'chatlog' });
     const sendQuick = i => act({ t: 'chat', i });
-    const scr = el('div', { class: 'screen online room' }, topbar(R.ranked ? 'RANKED MATCH' : 'ROOM', () => confirmLeave()),
+    const RG = gameOf(R.game);
+    const gameRules = RG ? el('div', { class: 'rset' }, el('h3', null, RG.name.toUpperCase() + ' RULES' + (host ? '' : ' (the host sets these)')),
+      ...(RG.options || []).map(op => seg(op.label, rules[op.key], op.values, v => HC.rule(op.key, v), canRule)),
+      el('p', { class: 'small muted' }, RG.blurb + '. ' + (RG.players[1] === 2 ? 'Two play; anyone else in the room watches.' : 'Up to ' + RG.players[1] + ' play (the first who are READY); anyone else watches.')),
+      el('button', { class: 'linkbtn', onclick: () => Arcade.howto(RG) }, 'How to play ' + RG.name)) : null;
+    const scr = el('div', { class: 'screen online room' + (RG ? ' g-' + RG.id : '') }, topbar(R.ranked ? 'RANKED MATCH' : RG ? RG.name.toUpperCase() + ' ROOM' : 'ROOM', () => confirmLeave()),
       el('div', { class: 'roomgrid' },
         el('section', { class: 'panel rmain' },
           el('div', { class: 'rhead' },
-            el('div', null, el('h2', null, R.name), el('div', { class: 'badges' }, R.ranked ? el('em', { class: 'pill hot' }, 'RANKED') : null, el('em', { class: 'pill' }, R.priv ? 'PRIVATE' : 'PUBLIC'), R.listed ? null : el('em', { class: 'pill' }, 'CODE ONLY'), R.locked ? el('em', { class: 'pill' }, 'LOCKED') : null, el('span', null, R.members.length + '/' + R.max + ' players'))),
+            el('div', null, el('h2', null, R.name), el('div', { class: 'badges' }, R.ranked ? el('em', { class: 'pill hot' }, 'RANKED') : null, el('em', { class: 'pill game' }, gameName(R.game).toUpperCase()), el('em', { class: 'pill' }, R.priv ? 'PRIVATE' : 'PUBLIC'), R.listed ? null : el('em', { class: 'pill' }, 'CODE ONLY'), R.locked ? el('em', { class: 'pill' }, 'LOCKED') : null, el('span', null, R.members.length + '/' + R.max + ' players'))),
             el('div', { class: 'codebox' }, el('small', null, 'ROOM CODE'), el('b', null, R.code), btn('COPY', () => { try { navigator.clipboard.writeText(R.code); toast('Copied ' + R.code + (R.priv ? ' (they\'ll need the password too)' : '')); } catch (e) { /* fine */ } }, 'ghost small'))),
           el('div', { class: 'rnow' + (M ? ' live' : '') }, ...now),
           R.last && !M ? el('p', { class: 'rlast' }, 'Last match: ' + R.last.names.map((n, i) => n + ' ' + R.last.pts[i]).join(' · ')) : null,
@@ -911,7 +1047,7 @@
             R.ranked ? null : btn(me.sit ? 'SITTING OUT' : 'SIT OUT', () => act({ t: 'sit', on: !me.sit }), 'ghost' + (me.sit ? ' on' : '') + (inMatch ? ' off' : '')),
             el('label', { class: 'check' }, el('input', { type: 'checkbox', checked: N.autoWatch || null, onchange: e => { N.autoWatch = e.target.checked; } }), 'Watch matches I\'m not in'),
             Object.keys(Auth.S.friends).some(id => Net.online(id)) ? btn('INVITE FRIENDS', () => inviteMenu(), 'ghost') : null),
-          el('div', { class: 'rset' }, el('h3', null, 'RULES' + (R.ranked ? ' (ranked: fixed)' : host ? '' : ' (the host sets these)')),
+          gameRules || el('div', { class: 'rset' }, el('h3', null, 'RULES' + (R.ranked ? ' (ranked: fixed)' : host ? '' : ' (the host sets these)')),
             seg('MODE', rules.mode, [['race', 'Race'], ['blitz', 'Blitz'], ['quad', 'Quad']], v => HC.rule('mode', v), canRule),
             rules.mode === 'quad' ? null : seg('LETTERS', rules.len, Engine.LENS.map(n => [n, String(n)]), v => HC.rule('len', +v), canRule),
             seg('ROUNDS', rules.rounds, [[1, '1'], [3, '3'], [5, '5'], [10, '10']], v => HC.rule('rounds', +v), canRule),
@@ -942,6 +1078,10 @@
       Menu.modal({ title: 'LEAVE MID-MATCH?', body: [el('p', null, R.ranked ? 'Leaving a ranked match counts as a loss.' : 'The match goes on without you.')], buttons: [['LEAVE', () => Online.leave(), 'danger'], ['STAY', () => {}, 'ghost']] });
       return;
     }
+    if (R.match && GV && !GV.over && GV.ids.includes(N.myId)) {
+      Menu.modal({ title: 'LEAVE MID-GAME?', body: [el('p', null, GV.ids.length <= 2 ? 'You\'ll forfeit: the game goes to the other player.' : 'The game goes on without you; your turns are skipped.')], buttons: [['LEAVE', () => Online.leave(), 'danger'], ['STAY', () => {}, 'ghost']] });
+      return;
+    }
     if (N.host && R.members.length > 1) {
       Menu.modal({ title: 'CLOSE THE ROOM?', body: [el('p', null, 'Everyone in it goes back to the lobby.')], buttons: [['CLOSE IT', () => Online.leave(), 'danger'], ['STAY', () => {}, 'ghost']] });
       return;
@@ -956,5 +1096,5 @@
   }
 
   Online.view = () => N && N.view;
-  Online._t = { PROTO, get N() { return N; }, get G() { return G; }, get H() { return H; }, HC };
+  Online._t = { PROTO, get N() { return N; }, get G() { return G; }, get H() { return H; }, get GM() { return GM; }, get GV() { return GV; }, HC };
 })();

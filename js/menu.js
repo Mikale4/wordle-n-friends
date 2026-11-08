@@ -155,11 +155,29 @@
     afterLogin(fresh) {
       if (Auth.prefs.autoOnline) Net.start();
       Social.init();
-      Menu.hub();
+      Menu.home();
       if (fresh) setTimeout(() => { toast('Welcome, ' + Auth.name + '! Your friend code is ' + Auth.name + '#' + Auth.tag, 'gold', 4200); howto(); }, 400);
     },
 
-    /* ------------------------------------------------------------------ hub */
+    /* home: the game picker (arcade.js) */
+    home() { Arcade.picker(); },
+    /* the bar along the top of the picker and the Wordle hub: you, your level and rank, friends, options */
+    homeBar(onBack) {
+      const S = Auth.S, L = Rank.level(S.xp);
+      return el('div', { class: 'topbar hubbar' },
+        onBack ? el('button', { class: 'backbtn', title: 'Back to the games (Esc)', 'aria-label': 'Back', onclick: () => { SFX.play('back'); onBack(); } }, '‹') : null,
+        logo('small'), el('div', { class: 'grow' }),
+        el('button', { class: 'me', onclick: () => Menu.stats(), title: 'Your stats' }, avatar(Auth.id, Auth.name),
+          el('span', { class: 'mename' }, el('b', null, Auth.name), el('small', null, '#' + Auth.tag)),
+          el('span', { class: 'melv' }, el('small', null, 'LV ' + L.lv), el('i', { class: 'xpbar' }, el('i', { style: { width: (L.into / L.need * 100) + '%' } }))),
+          Rank.badge(S.rank.rating, { small: true })),
+        socialButtons(),
+        el('button', { class: 'iconbtn', title: 'Options', onclick: () => Menu.options() }, el('span', { class: 'ico ico-gear' })),
+        el('button', { class: 'iconbtn', title: 'How to play', onclick: howto }, el('span', { class: 'ico ico-help' })),
+        btn('LOG OUT', () => { Auth.logout(); Menu.login('in'); }, 'ghost small'));
+    },
+
+    /* ------------------------------------------------------------------ hub (Wordle) */
     hub() {
       if (!Auth.user) return Menu.login();
       if (window.Online) Online.away();
@@ -190,15 +208,7 @@
         }
       };
       const s = el('div', { class: 'screen hub' },
-        el('div', { class: 'topbar hubbar' }, logo('small'), el('div', { class: 'grow' }),
-          el('button', { class: 'me', onclick: () => Menu.stats(), title: 'Your stats' }, avatar(Auth.id, Auth.name),
-            el('span', { class: 'mename' }, el('b', null, Auth.name), el('small', null, '#' + Auth.tag)),
-            el('span', { class: 'melv' }, el('small', null, 'LV ' + L.lv), el('i', { class: 'xpbar' }, el('i', { style: { width: (L.into / L.need * 100) + '%' } }))),
-            Rank.badge(R.rating, { small: true })),
-          socialButtons(),
-          el('button', { class: 'iconbtn', title: 'Options', onclick: () => Menu.options() }, el('span', { class: 'ico ico-gear' })),
-          el('button', { class: 'iconbtn', title: 'How to play', onclick: howto }, el('span', { class: 'ico ico-help' })),
-          btn('LOG OUT', () => { Auth.logout(); Menu.login('in'); }, 'ghost small')),
+        Menu.homeBar(() => Menu.home()),
         room ? el('div', { class: 'roombanner' }, el('span', null, "You're still in room "), el('b', null, room.name + (room.playing ? ' · match on' : '')), el('div', { class: 'grow' }),
           btn('BACK TO THE ROOM', () => Online.back(), 'small hot'), btn('LEAVE IT', () => { Online.leave(true); Menu.hub(); }, 'ghost small')) : null,
         el('div', { class: 'hubmain' },
@@ -234,7 +244,7 @@
       const oldPw = el('input', { type: 'password', class: 'input', placeholder: 'Current password', autocomplete: 'current-password' });
       const newPw = el('input', { type: 'password', class: 'input', placeholder: 'New password', autocomplete: 'new-password' });
       const st = { up: 'Online', connecting: 'Connecting...', down: 'Can\'t reach the relay', off: 'Offline' }[Net.state];
-      App.screen(el('div', { class: 'screen options' }, topbar('OPTIONS', () => Menu.hub()),
+      App.screen(el('div', { class: 'screen options' }, topbar('OPTIONS', () => Menu.home()),
         el('div', { class: 'panel optpanel' },
           el('h3', null, 'LOOK AND SOUND'),
           seg('THEME', P.theme, [['dark', 'Dark'], ['light', 'Light']], v => set('theme', v)),
@@ -273,7 +283,7 @@
           el('div', null, el('b', null, st.streak), el('small', null, 'STREAK')), el('div', null, el('b', null, st.maxStreak), el('small', null, 'BEST'))), extra || null);
       const scoreBox = (title, st, unit) => el('div', { class: 'statbox' }, el('h3', null, title),
         el('div', { class: 'nums' }, el('div', null, el('b', null, st.played), el('small', null, 'PLAYED')), el('div', null, el('b', null, st.best), el('small', null, 'BEST ' + unit)), el('div', null, el('b', null, st.total || 0), el('small', null, 'ALL-TIME ' + unit))));
-      App.screen(el('div', { class: 'screen stats' }, topbar('STATS', () => Menu.hub()),
+      App.screen(el('div', { class: 'screen stats' }, topbar('STATS', () => Menu.home()),
         el('div', { class: 'panel statpanel' },
           el('div', { class: 'statme' }, avatar(Auth.id, Auth.name, 'lg'), el('div', null, el('h2', null, Auth.name, el('small', null, ' #' + Auth.tag)),
             el('div', { class: 'row' }, Rank.badge(R.rating), el('span', { class: 'lvchip' }, 'LEVEL ' + L.lv)),
