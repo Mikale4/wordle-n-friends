@@ -183,7 +183,7 @@
     const tick = () => {
       if (!started) return;
       const left = ends - Date.now(); clock.textContent = U.clock(left); bar.style.width = U.clamp(left / BLITZ_MS * 100, 0, 100) + '%';
-      C.stageBar.classList.toggle('low', left < 20000);
+      C.stageBar.classList.toggle('low', left < 20000); Music.urgent(left < 20000);
       if (left <= 0) finish();
     };
     const finish = () => {

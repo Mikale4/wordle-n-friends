@@ -4,7 +4,7 @@
   let ctx = null, master = null;
   const ac = () => {
     if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); master.gain.value = 0.35; master.connect(ctx.destination); } catch (e) { return null; } }
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx.state === 'suspended' && !document.hidden) ctx.resume();
     return ctx;
   };
   function tone(f, t0, dur, o = {}) {
@@ -34,6 +34,7 @@
     solve: t => [784, 1047].forEach((f, i) => tone(f, t + i * 0.08, 0.2, { type: 'triangle', vol: 0.3 })),
   };
   window.SFX = {
+    ctx: () => ac(),            // (shared with the music)
     play(name) {
       if (window.Auth && Auth.user && !Auth.prefs.sound) return;
       const c = ac(); if (!c || !SOUNDS[name]) return;

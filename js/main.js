@@ -13,6 +13,7 @@
       s.innerHTML = ''; if (node) s.append(node);
       if (keep.length) { const all = [node, ...node.querySelectorAll('*')]; for (const k of keep) { const e = all[k.i]; if (e && e.className === k.cls) e.scrollTop = k.top; } }
       window.scrollTo(0, 0);
+      if (window.Music && node) Music.forScreen(node.className);
     },
     onLeave(fn) { leave.push(fn); },
   };

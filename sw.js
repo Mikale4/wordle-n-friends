@@ -2,7 +2,7 @@
    connection. The page always comes from the network when there is one; the game's own files are stamped with the
    version (?v=..., tools/bump.py), so a saved copy is never stale. Online play (PeerJS, the MQTT relays) always goes
    straight to the network. VERSION is set by tools/bump.py; a new version clears the old copies. */
-const VERSION = '202611072313';
+const VERSION = '202611080204';
 const CACHE = 'wnf-' + VERSION;
 const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png'];
 
@@ -24,7 +24,7 @@ self.addEventListener('fetch', e => {
         .catch(() => caches.match('./index.html').then(hit => hit || caches.match('./'))));
       return;
     }
-    if (url.pathname.includes('/tools/')) return;
+    if (url.pathname.includes('/tools/') || url.pathname.includes('/music/')) return;
     e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => keep(req, res))));
     return;
   }

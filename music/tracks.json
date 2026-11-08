@@ -1,0 +1,29 @@
+{
+  "default": "elevenlabs",
+  "sets": {
+    "elevenlabs": {
+      "label": "ElevenLabs",
+      "credit": "Made with ElevenLabs Music.",
+      "tracks": {
+        "title": { "file": "elevenlabs/title.mp3", "loopStart": 0.5, "loopEnd": 33.0434, "gain": 0.5 },
+        "menu": { "file": "elevenlabs/menu.mp3", "loopStart": 0.5, "loopEnd": 60.513, "gain": 0.57 },
+        "lobby": { "file": "elevenlabs/lobby.mp3", "loopStart": 0.5, "loopEnd": 53.8377, "gain": 0.58 },
+        "think": { "file": "elevenlabs/think.mp3", "loopStart": 0.5, "loopEnd": 56.295, "gain": 0.65 },
+        "race": { "file": "elevenlabs/race.mp3", "loopStart": 0.5, "loopEnd": 56.9813, "gain": 0.58 },
+        "ranked": { "file": "elevenlabs/ranked.mp3", "loopStart": 0.5, "loopEnd": 61.465, "gain": 0.44 }
+      }
+    },
+    "suno": {
+      "label": "Suno",
+      "credit": "Made with Suno.",
+      "tracks": {
+        "title": { "file": "suno/title.mp3", "loopStart": 0.5, "loopEnd": 41.1786, "gain": 0.66 },
+        "menu": { "file": "suno/menu.mp3", "loopStart": 0.5, "loopEnd": 60.5111, "gain": 0.69 },
+        "lobby": { "file": "suno/lobby.mp3", "loopStart": 0.5, "loopEnd": 54.4547, "gain": 0.73 },
+        "think": { "file": "suno/think.mp3", "loopStart": 0.5, "loopEnd": 44.6265, "gain": 0.67 },
+        "race": { "file": "suno/race.mp3", "loopStart": 0.5, "loopEnd": 102.644, "gain": 0.69 },
+        "ranked": { "file": "suno/ranked.mp3", "loopStart": 0.5, "loopEnd": 66.958, "gain": 0.73 }
+      }
+    }
+  }
+}

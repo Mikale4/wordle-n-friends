@@ -573,7 +573,7 @@
     G.waitEl = el('p', { class: 'gwait', hidden: true }, 'Done! Waiting for the others...');
     N.chatEl = el('div', { class: 'chatlog' });
     const sayBox = chatInput();
-    const scr = el('div', { class: 'screen online game mode-' + G.mode },
+    const scr = el('div', { class: 'screen online game mode-' + G.mode + (R.ranked ? ' ranked' : '') },
       el('div', { class: 'topbar' }, el('button', { class: 'backbtn', title: 'Back to the room', onclick: () => { SFX.play('back'); N.view = 'room'; show(); } }, '‹'),
         el('h1', null, R.ranked ? 'RANKED' : MODE_TXT[G.mode].toUpperCase()), el('em', { class: 'pill' }, 'ROUND ' + G.r + ' / ' + G.rounds),
         G.hard ? el('em', { class: 'pill' }, 'HARD') : null, el('div', { class: 'grow' }), G.mineEl, G.clock),
@@ -620,6 +620,7 @@
     if (G.ends) {
       const left = G.ends - now; G.clock.textContent = U.clock(left);
       const total = G.ends - G.start; G.bar.firstChild.style.width = U.clamp(left / total * 100, 0, 100) + '%'; G.bar.classList.toggle('low', left < 15000);
+      Music.urgent(G.phase === 'play' && left < 15000);
     } else G.clock.textContent = '';
   }
   function gnote(text, cls, ms) {
@@ -653,6 +654,7 @@
       el('p', { class: 'small muted' }, d.last ? 'Final results in a moment...' : 'Next round in a moment...'));
     const scr = document.querySelector('.screen.online.game .gmain');
     if (scr) { scr.querySelectorAll('.roundover').forEach(x => x.remove()); scr.append(box); }
+    Music.urgent(false); Music.duck(true);
     drawProg();
   }
   function matchOverlay(d, me, rk) {

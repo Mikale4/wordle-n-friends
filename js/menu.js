@@ -27,7 +27,9 @@
   }
   /* a pop-up: { title, body: [nodes], buttons: [[label, fn, cls]], cls, block (no closing it by clicking outside) } */
   function modal(o) {
-    const close = () => { ov.remove(); if (o.onClose) o.onClose(); };
+    const res = /results/.test(o.cls || '');
+    if (res && window.Music) Music.duck(true);
+    const close = () => { ov.remove(); if (res && window.Music) Music.duck(false); if (o.onClose) o.onClose(); };
     const ov = el('div', { class: 'overlay' + (o.block ? ' block' : ''), onclick: e => { if (e.target === ov && !o.block) close(); } },
       el('div', { class: 'modal ' + (o.cls || '') },
         el('div', { class: 'mhead' }, el('h2', null, o.title || ''), el('button', { class: 'mclose', 'aria-label': 'Close', onclick: () => { SFX.play('back'); close(); } }, '×')),
@@ -237,7 +239,10 @@
           el('h3', null, 'LOOK AND SOUND'),
           seg('THEME', P.theme, [['dark', 'Dark'], ['light', 'Light']], v => set('theme', v)),
           seg('TILE COLOURS', P.cb, [[false, 'Standard'], [true, 'High contrast']], v => set('cb', v === true || v === 'true'), 'High contrast swaps to orange and blue, easier to tell apart for colour-blind players.'),
-          seg('SOUND', P.sound, [[true, 'On'], [false, 'Off']], v => set('sound', v === true || v === 'true')),
+          seg('MUSIC', Music.volume, [[0, 'Off'], [0.3, 'Low'], [0.6, 'Medium'], [1, 'High']], v => { Music.setVolume(+v); Menu.options(); }),
+          seg('SOUNDTRACK', Music.soundtrack, Music.soundtracks.map(s => [s[0], s[1]]), v => { Music.setSoundtrack(v); Menu.options(); },
+            'Three versions of the same six themes. ' + ((Music.soundtracks.find(s => s[0] === Music.soundtrack) || [])[2] || '')),
+          seg('SOUND EFFECTS', P.sound, [[true, 'On'], [false, 'Off']], v => set('sound', v === true || v === 'true')),
           el('h3', null, 'GAMEPLAY'),
           seg('HARD MODE', P.hard, [[false, 'Off'], [true, 'On']], v => set('hard', v === true || v === 'true'), 'Hits must stay in place and near letters must be reused, in Daily, Classic, Blitz, Survival and VS CPU. Online rooms set their own.'),
           el('h3', null, 'ONLINE'),

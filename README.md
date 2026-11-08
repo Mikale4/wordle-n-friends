@@ -46,6 +46,17 @@ that sit in the top bar of every screen. If you step out of an online room, a ba
 
 Hard mode (Options): hits stay in place and near letters must be reused. Online rooms set it per room.
 
+## Music
+
+Six themes: **title** (bouncy marimba pop), **menu** (lo-fi jazz), **lobby** (funky), **think** (calm piano for Daily,
+Classic, Quad and Survival), **race** (driving chiptune for Blitz, VS CPU and online races, speeding up when the clock
+runs low) and **ranked** (darker and heavier). Each comes in three versions, picked under Options → SOUNDTRACK:
+**ElevenLabs** (the default) and **Suno**, made with those tools and cut into seamless loops (`music/elevenlabs/`,
+`music/suno/`), and **Composed**, written in code and played by a small WebAudio sequencer (`js/music.js`). Music
+cross-fades between screens, dips under results, and pauses when the tab is hidden; volume is under Options → MUSIC.
+[music/README.md](music/README.md) has the prompts, how to add or replace a track (`tools/loopify.py` turns a song into
+a loop), and a note on rights: both sets were made on free plans, which are for non-commercial use.
+
 ## Online (set up like Knock//Back)
 
 There is no server of ours. Two pieces, both free and public, the same ones Knock//Back uses:
@@ -102,6 +113,8 @@ messages from everyone or friends only; swear filter.
 | --- | --- |
 | `index.html` | the page; loads everything |
 | `js/util.js` | DOM, storage, seeded random, text cleaning |
+| `js/audio.js`, `js/music.js` | sound effects, and the soundtrack (the composed tracks, or the recorded sets in `music/`) |
+| `music/` | the ElevenLabs and Suno loops, `tracks.json` (their loop points), prompts and notes |
 | `js/words.js` | the answer and guess lists (generated, ~215 KB) |
 | `js/engine.js` | scoring, hard mode, games of 1–4 boards, the Daily word, the CPU solver |
 | `js/auth.js` | accounts, saves, the per-account key pairs |
@@ -115,7 +128,7 @@ messages from everyone or friends only; swear filter.
 | `js/main.js` | screens and keyboard routing |
 | `css/style.css` | all styles (dark and light themes, high-contrast tiles) |
 | `sw.js`, `manifest.webmanifest`, `icons/` | installable app and offline solo play |
-| `tools/` | dev server, version stamp, word-list builder, icon maker, tests |
+| `tools/` | dev server, version stamp, word-list builder, icon maker, tests, song-to-loop cutter (`loopify.py`) |
 
 ## Word lists
 
