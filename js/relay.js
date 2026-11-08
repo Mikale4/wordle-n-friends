@@ -45,19 +45,42 @@
     return subtle.deriveKey({ name: 'ECDH', public: pub }, kp.privateKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
   }
 
-  /* MQTT clients on both brokers, subscribed to `subs`; f(topic, frame) for every frame that arrives */
+  /* MQTT clients on both brokers, subscribed to `subs`; f(topic, frame) for every frame that arrives.
+     Sending is paced per broker: the public EMQX broker passes about 10 messages a second from one client and
+     silently drops the rest of a burst (HiveMQ's takes bursts), so each client has its own queue. The receiver
+     keeps whichever copy arrives first. pub(topic, frame, u): u (optional) counts the copies still queued. */
+  const PACE = url => (/emqx/.test(url) ? 8 : 40);           // messages a second
   async function clients(subs, f, will) {
     await Net.loadMqtt();
+    let ended = false;
     const cl = Net.BROKERS.map(url => {
       const c = mqtt.connect(url, { clientId: 'wnfr_' + U.rid(10), keepalive: 30, reconnectPeriod: 4000, connectTimeout: 8000, clean: true, will });
       c.on('connect', () => c.subscribe(Object.fromEntries(subs.map(s => [s, { qos: 1 }]))));
       c.on('message', (t, m) => { let fr; try { fr = JSON.parse(td.decode(m)); } catch (e) { return; } if (fr && typeof fr === 'object') f(t, fr); });
       c.on('error', () => {});
-      return c;
+      const Q = { c, rate: PACE(url), tokens: PACE(url), last: Date.now(), q: [], t: null };
+      Q.pump = () => {
+        Q.t = null; if (ended) return;
+        const now = Date.now();
+        Q.tokens = Math.min(Q.rate, Q.tokens + (now - Q.last) * Q.rate / 1000); Q.last = now;
+        while (Q.q.length && Q.tokens >= 1) {
+          const it = Q.q.shift(); if (it.u) it.u.q--;
+          if (!c.connected) continue;                         // (lost: the other broker, or a resend, covers it)
+          try { c.publish(it.t, JSON.stringify(it.fr), { qos: 1 }); Q.tokens--; if (it.u) it.u.at = now; } catch (e) { /* fine */ }
+        }
+        if (Q.q.length) Q.t = setTimeout(Q.pump, Math.ceil(1000 / Q.rate));
+      };
+      return Q;
     });
     return {
-      pub(t, fr) { const s = JSON.stringify(fr); for (const c of cl) if (c.connected) { try { c.publish(t, s, { qos: 1 }); } catch (e) { /* fine */ } } },
-      end() { setTimeout(() => cl.forEach(c => { try { c.end(true); } catch (e) { /* fine */ } }), 300); },
+      pub(t, fr, u) {
+        for (const Q of cl) {
+          if (Q.q.length > 300) { const old = Q.q.shift(); if (old.u) old.u.q--; }
+          Q.q.push({ t, fr, u }); if (u) u.q++;
+          if (!Q.t) Q.pump();
+        }
+      },
+      end() { setTimeout(() => { ended = true; cl.forEach(Q => { clearTimeout(Q.t); try { Q.c.end(true); } catch (e) { /* fine */ } }); }, 300); },
     };
   }
 
@@ -76,10 +99,11 @@
         const n = ++L.seq, iv = crypto.getRandomValues(new Uint8Array(12));
         subtle.encrypt({ name: 'AES-GCM', iv }, L.key, te.encode(JSON.stringify(msg))).then(ct => {
           if (L.closed) return;
-          const fr = { k: 'd', n, iv: b64(iv), ct: b64(ct) };
-          L.unsent.set(n, { fr, at: Date.now() });
+          const fr = { k: 'd', n, iv: b64(iv), ct: b64(ct) }, u = { fr, at: Date.now(), q: 0 };
+          L.unsent.set(n, u);
           if (L.unsent.size > 400) L.unsent.delete(L.unsent.keys().next().value);
-          out(fr);
+          fr.a = L.upTo(); clearTimeout(L.rxT); L.rxT = null;  // (it confirms what we've had, too)
+          out(fr, u);
         }).catch(() => {});
       },
       /* everything up to this number has arrived */
@@ -98,7 +122,7 @@
         if (fr.k === 'fin') { L.end(false); return; }
         if (typeof fr.a === 'number') for (const n of [...L.unsent.keys()]) if (n <= fr.a) L.unsent.delete(n);
         if (fr.k !== 'd' || !L.key || typeof fr.n !== 'number') return;
-        if (!L.rxT) L.rxT = setTimeout(() => { L.rxT = null; if (!L.closed) out({ k: 'rx', a: L.upTo() }); }, 120);   // (copies too: our last 'rx' may have been lost)
+        if (!L.rxT) L.rxT = setTimeout(() => { L.rxT = null; if (!L.closed) out({ k: 'rx', a: L.upTo() }); }, 250);   // (copies too: our last 'rx' may have been lost)
         if (fr.n < L.next || L.held.has(fr.n) || L.held.size > 500) return;
         L.held.set(fr.n, fr);
         L.chain = L.chain.then(L.drain);
@@ -115,7 +139,7 @@
          rest for ever; a silent link is a closed one */
       tick(now) {
         if (now - L.heard > (L.suspect ? GONE : DEAD)) { L.end(false); return; }
-        for (const u of L.unsent.values()) if (now - u.at > RESEND) { u.at = now; out(u.fr); }
+        for (const u of L.unsent.values()) if (!u.q && now - u.at > RESEND) { u.at = now; u.fr.a = L.upTo(); out(u.fr, u); }
         if (L.held.size && !L.held.has(L.next)) {
           if (!L.gapAt) L.gapAt = now;
           else if (now - L.gapAt > GAP) { L.next = Math.min(...L.held.keys()); L.gapAt = 0; L.chain = L.chain.then(L.drain); }
@@ -144,7 +168,7 @@
         try {
           const kp = await keyPair(), key = await sharedKey(kp, fr.pk);
           if (stopped) return;
-          const link = Link('rl-' + f, x => C.pub(at(code, 'g', f), x), () => links.delete(f));
+          const link = Link('rl-' + f, (x, u) => C.pub(at(code, 'g', f), x, u), () => links.delete(f));
           link.key = key; link.open = true; link.ack = { k: 'ack', pk: await pubOf(kp) };
           links.set(f, link);
           C.pub(at(code, 'g', f), link.ack);
@@ -168,7 +192,7 @@
   Relay.join = code => {
     const f = U.rid(12);
     let C = null, kp = null, synT = null, hbT = null, tickT = null;
-    const L = Link('rl-host', x => { if (C) C.pub(at(code, 'h'), Object.assign({ f }, x)); }, () => {
+    const L = Link('rl-host', (x, u) => { if (C) C.pub(at(code, 'h'), Object.assign({ f }, x), u); }, () => {
       clearTimeout(synT); clearInterval(hbT); clearInterval(tickT); if (C) C.end();
     });
     async function got(t, fr) {
